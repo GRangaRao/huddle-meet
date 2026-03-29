@@ -39,13 +39,11 @@ COPY server.py .
 COPY media_worker.js .
 COPY static/ static/
 
-# mediasoup RTC ports
-ENV PORT=7860
+# Port defaults (overridden by platform env vars)
+ENV PORT=10000
 ENV MEDIA_WORKER_PORT=3000
 ENV RTC_MIN_PORT=10000
 ENV RTC_MAX_PORT=10100
-EXPOSE 7860
-EXPOSE 10000-10100/udp
-EXPOSE 10000-10100/tcp
+EXPOSE 10000
 
 CMD ["python", "server.py"]
