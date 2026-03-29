@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Purple accent matching Huddle brand #6c5ce7 -->
+    <color name="purple_primary">#6C5CE7</color>
+    <color name="purple_dark">#5A4BD1</color>
+    <color name="purple_light">#A29BFE</color>
+    <color name="bg_dark">#0A0A0F</color>
+    <color name="surface_dark">#16161E</color>
+    <color name="white">#FFFFFF</color>
+</resources>

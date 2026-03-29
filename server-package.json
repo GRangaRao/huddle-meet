@@ -1,0 +1,9 @@
+{
+  "name": "huddle-media-worker",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "express": "^4.21.0",
+    "mediasoup": "^3.14.0"
+  }
+}

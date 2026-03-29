@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Huddle - Video Calls</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mediasoup-client@3/lib/mediasoup-client.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <!-- Landing / Join Screen -->
+    <div id="joinScreen" class="screen active">
+        <div class="join-container">
+            <div class="logo-section">
+                <div class="logo"><span class="material-icons-round">videocam</span></div>
+                <h1>Huddle</h1>
+                <p class="subtitle">Simple, secure video calls in your browser</p>
+                <p class="subline">No downloads · Join in seconds</p>
+
+                <!-- Auth section -->
+                <div id="authSection" class="auth-section">
+                    <button id="googleSignInBtn" class="btn-google" style="display:none">
+                        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+                        Sign in with Google
+                    </button>
+                    <div id="userInfo" class="user-info" style="display:none">
+                        <img id="userAvatar" class="user-avatar" src="" alt="">
+                        <span id="userName" class="user-name"></span>
+                        <button id="signOutBtn" class="btn-signout" title="Sign out">
+                            <span class="material-icons-round" style="font-size:16px">logout</span>
+                        </button>
+                    </div>
+                    <button id="authGuestBtn" class="btn-guest" style="display:none">or continue as Guest</button>
+                </div>
+            </div>
+
+            <div class="join-layout">
+                <!-- Left column: preview + actions -->
+                <div class="join-left">
+                    <div class="join-card">
+                        <div class="preview-section">
+                            <span class="preview-label">Camera preview</span>
+                            <div class="preview-container">
+                                <video id="previewVideo" autoplay muted playsinline></video>
+                                <div class="preview-placeholder" id="previewPlaceholder">
+                                    <span class="material-icons-round">videocam_off</span>
+                                    <p>Camera off</p>
+                                </div>
+                                <div class="preview-controls">
+                                    <button id="previewMic" class="ctrl-btn active" title="Toggle microphone">
+                                        <span class="icon-on"><span class="material-icons-round">mic</span></span>
+                                        <span class="icon-off"><span class="material-icons-round">mic_off</span></span>
+                                    </button>
+                                    <button id="previewCam" class="ctrl-btn active" title="Toggle camera">
+                                        <span class="icon-on"><span class="material-icons-round">videocam</span></span>
+                                        <span class="icon-off"><span class="material-icons-round">videocam_off</span></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="prejoin-group">
+                            <input type="text" id="nameInput" placeholder="Your name" maxlength="50" autocomplete="name">
+                            <span class="name-hint">This name will be visible to others in the call</span>
+                        </div>
+
+                        <div class="join-actions">
+                            <div class="action-buttons">
+                                <button id="newMeetingBtn" class="btn btn-primary">
+                                    <span class="material-icons-round">video_call</span> New meeting
+                                </button>
+                                <button id="scheduleMeetingBtn" class="btn btn-outline">
+                                    <span class="material-icons-round">calendar_month</span> Schedule
+                                </button>
+                            </div>
+                            <div class="divider"><span>or</span></div>
+                            <div class="join-code-section">
+                                <span class="join-code-label">Have a code?</span>
+                                <div class="join-row">
+                                    <input type="text" id="roomInput" placeholder="Enter room code" maxlength="20">
+                                    <button id="joinBtn" class="btn btn-secondary">
+                                        <span class="material-icons-round">login</span> Join
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right column: upcoming meetings -->
+                <div class="join-right">
+                    <div id="scheduledMeetingsList" class="scheduled-meetings-panel">
+                        <h3><span class="material-icons-round">event_note</span> Upcoming Meetings</h3>
+                        <div id="scheduledMeetingsContent">
+                            <div class="meetings-empty">
+                                <span class="material-icons-round">event_available</span>
+                                <p>No upcoming meetings</p>
+                                <span>Schedule one to get started</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Schedule Meeting Modal -->
+    <div class="modal-overlay" id="scheduleModal" style="display:none">
+        <div class="modal-card schedule-modal">
+            <div class="modal-header">
+                <h3><span class="material-icons-round">calendar_month</span> Schedule Meeting</h3>
+                <button class="icon-btn" id="closeScheduleModal">✕</button>
+            </div>
+            <div class="modal-body schedule-form">
+                <div class="form-group">
+                    <label for="schTopic">Topic</label>
+                    <input type="text" id="schTopic" placeholder="Meeting topic" maxlength="100">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="schDate">Date</label>
+                        <input type="date" id="schDate">
+                    </div>
+                    <div class="form-group">
+                        <label for="schTime">Time</label>
+                        <select id="schTime"></select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="schDuration">Duration</label>
+                        <select id="schDuration">
+                            <option value="15">15 minutes</option>
+                            <option value="30" selected>30 minutes</option>
+                            <option value="45">45 minutes</option>
+                            <option value="60">1 hour</option>
+                            <option value="90">1.5 hours</option>
+                            <option value="120">2 hours</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="schTimezone">Timezone</label>
+                        <select id="schTimezone"></select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="schRecurring">
+                        <span>Recurring meeting</span>
+                    </label>
+                </div>
+                <div id="schRecurringOptions" class="form-group" style="display:none">
+                    <select id="schRecurrence">
+                        <option value="daily">Daily</option>
+                        <option value="weekly" selected>Weekly</option>
+                        <option value="biweekly">Bi-weekly</option>
+                        <option value="monthly">Monthly</option>
+                    </select>
+                    <div class="form-row" style="margin-top:8px">
+                        <div class="form-group">
+                            <label for="schEndDate">End by</label>
+                            <input type="date" id="schEndDate">
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="form-divider">
+                <h4>Security</h4>
+
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="schPasscode" checked>
+                        <span>Require passcode</span>
+                    </label>
+                </div>
+                <div id="schPasscodeGroup" class="form-group">
+                    <input type="text" id="schPasscodeInput" placeholder="Meeting passcode" maxlength="20">
+                </div>
+
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="schWaitingRoom">
+                        <span>Enable waiting room</span>
+                    </label>
+                </div>
+
+                <hr class="form-divider">
+                <h4>Video</h4>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Host video</label>
+                        <div class="radio-row">
+                            <label><input type="radio" name="schHostVideo" value="on" checked> On</label>
+                            <label><input type="radio" name="schHostVideo" value="off"> Off</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Participant video</label>
+                        <div class="radio-row">
+                            <label><input type="radio" name="schParticipantVideo" value="on" checked> On</label>
+                            <label><input type="radio" name="schParticipantVideo" value="off"> Off</label>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="form-divider">
+                <h4>Options</h4>
+
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="schMuteOnEntry" checked>
+                        <span>Mute participants on entry</span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="schAutoRecord">
+                        <span>Auto-record meeting</span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label for="schDescription">Description (optional)</label>
+                    <textarea id="schDescription" rows="3" placeholder="Meeting agenda or notes..."></textarea>
+                </div>
+
+                <div class="schedule-actions">
+                    <button id="schCancelBtn" class="btn btn-secondary">Cancel</button>
+                    <button id="schSaveBtn" class="btn btn-primary"><span class="material-icons-round">event_available</span> Schedule</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Call Screen -->
+    <div id="callScreen" class="screen">
+        <!-- Waiting Room Overlay -->
+        <div id="waitingRoomOverlay" class="overlay-screen" style="display:none">
+            <div class="overlay-card">
+                <span class="material-icons-round" style="font-size:48px;color:var(--blue-600)">hourglass_top</span>
+                <h2>Waiting Room</h2>
+                <p id="waitingRoomMsg">Please wait for the host to let you in...</p>
+                <button id="waitingLeaveBtn" class="btn btn-secondary" style="margin-top:16px">Leave</button>
+            </div>
+        </div>
+
+        <!-- Reactions Overlay -->
+        <div id="reactionsOverlay" class="reactions-overlay"></div>
+
+        <div class="call-layout">
+            <!-- Video Grid -->
+            <div class="video-grid" id="videoGrid">
+                <!-- Local video -->
+                <div class="video-tile" id="localTile" data-peer="local">
+                    <video id="localVideo" autoplay muted playsinline></video>
+                    <div class="video-off-overlay" id="localVideoOff" style="display:none">
+                        <div class="avatar"><span class="material-icons-round">person</span></div>
+                    </div>
+                    <div class="hand-indicator" id="localHand" style="display:none">✋</div>
+                    <div class="tile-label">
+                        <span class="tile-name" id="localName">You</span>
+                        <span class="mic-indicator" id="localMicIndicator"><span class="material-icons-round">mic</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Side Panels -->
+            <!-- Chat Panel -->
+            <div class="chat-panel" id="chatPanel">
+                <div class="chat-header">
+                    <h3>Chat</h3>
+                    <button id="closeChatBtn" class="icon-btn">✕</button>
+                </div>
+                <div class="chat-messages" id="chatMessages"></div>
+                <div class="chat-input-row">
+                    <input type="text" id="chatInput" placeholder="Type a message..." maxlength="500">
+                    <button id="sendChatBtn" class="btn btn-small">Send</button>
+                </div>
+            </div>
+
+            <!-- Participants Panel -->
+            <div class="side-panel" id="participantsPanel">
+                <div class="panel-header-bar">
+                    <h3>Participants</h3>
+                    <button id="closeParticipantsBtn" class="icon-btn">✕</button>
+                </div>
+                <div class="host-controls" id="hostControls" style="display:none">
+                    <button id="muteAllBtn" class="btn btn-small btn-outline">Mute All</button>
+                    <button id="lowerAllHandsBtn" class="btn btn-small btn-outline">Lower All Hands</button>
+                    <div class="toggle-row">
+                        <label><input type="checkbox" id="waitingRoomToggle"> Waiting Room</label>
+                        <label><input type="checkbox" id="lockMeetingToggle"> Lock Meeting</label>
+                    </div>
+                </div>
+                <!-- Waiting list (host only) -->
+                <div id="waitingList" style="display:none">
+                    <h4 class="section-title">Waiting Room</h4>
+                    <div id="waitingListContent"></div>
+                </div>
+                <h4 class="section-title" id="participantCountTitle">In Meeting (1)</h4>
+                <div id="participantList"></div>
+            </div>
+
+            <!-- Whiteboard Panel -->
+            <div class="side-panel wide-panel" id="whiteboardPanel">
+                <div class="panel-header-bar">
+                    <h3>Whiteboard</h3>
+                    <div class="wb-tools">
+                        <input type="color" id="wbColor" value="#1a73e8" title="Brush color">
+                        <input type="range" id="wbSize" min="1" max="20" value="3" title="Brush size">
+                        <button id="wbEraser" class="btn btn-small btn-outline">Eraser</button>
+                        <button id="wbClear" class="btn btn-small btn-outline">Clear</button>
+                    </div>
+                    <button id="closeWhiteboardBtn" class="icon-btn">✕</button>
+                </div>
+                <canvas id="whiteboardCanvas" width="900" height="500"></canvas>
+            </div>
+
+            <!-- Polls Panel -->
+            <div class="side-panel" id="pollsPanel">
+                <div class="panel-header-bar">
+                    <h3>Polls</h3>
+                    <button id="closePollsBtn" class="icon-btn">✕</button>
+                </div>
+                <div id="createPollSection" style="display:none">
+                    <input type="text" id="pollQuestion" placeholder="Poll question..." maxlength="200">
+                    <div id="pollOptionsContainer">
+                        <input type="text" class="poll-option-input" placeholder="Option 1" maxlength="100">
+                        <input type="text" class="poll-option-input" placeholder="Option 2" maxlength="100">
+                    </div>
+                    <button id="addPollOption" class="text-btn">+ Add option</button>
+                    <button id="launchPollBtn" class="btn btn-small" style="width:100%;margin-top:8px">Launch Poll</button>
+                </div>
+                <div id="activePollsList"></div>
+            </div>
+
+            <!-- Files Panel -->
+            <div class="side-panel" id="filesPanel">
+                <div class="panel-header-bar">
+                    <h3>Shared Files</h3>
+                    <button id="closeFilesBtn" class="icon-btn">✕</button>
+                </div>
+                <div class="files-upload-area" id="filesDropZone">
+                    <span class="material-icons-round" style="font-size:32px;color:var(--text-tertiary)">cloud_upload</span>
+                    <p>Drag & drop files here or</p>
+                    <label class="btn btn-small btn-primary files-browse-btn">
+                        <span class="material-icons-round" style="font-size:16px">attach_file</span> Browse
+                        <input type="file" id="fileInput" multiple hidden>
+                    </label>
+                    <p class="files-hint">Max 50 MB per file</p>
+                </div>
+                <div id="filesList" class="files-list"></div>
+            </div>
+
+            <!-- Meeting Notes Panel -->
+            <div class="side-panel" id="notesPanel">
+                <div class="panel-header-bar">
+                    <h3>Meeting Notes</h3>
+                    <button id="closeNotesBtn" class="icon-btn">✕</button>
+                </div>
+                <textarea id="notesTextarea" placeholder="Type your meeting notes here..."></textarea>
+                <div class="notes-sections">
+                    <details id="notesPollsSummary">
+                        <summary>Polls Summary</summary>
+                        <div id="notesPollsContent" class="notes-auto-content">No polls yet.</div>
+                    </details>
+                    <details id="notesWhiteboardSummary">
+                        <summary>Whiteboard Snapshot</summary>
+                        <div id="notesWhiteboardContent" class="notes-auto-content"><em>Open whiteboard to capture.</em></div>
+                    </details>
+                    <details id="notesBreakoutSummary">
+                        <summary>Breakout Rooms</summary>
+                        <div id="notesBreakoutContent" class="notes-auto-content">No breakout rooms yet.</div>
+                    </details>
+                    <details id="notesTranscriptSummary">
+                        <summary>Discussion Transcript</summary>
+                        <div id="notesTranscriptContent" class="notes-auto-content"><em>Enable captions (CC) to auto-capture discussion.</em></div>
+                    </details>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:8px">
+                    <button id="generateSummaryBtn" class="btn btn-small" style="flex:1"><span class="material-icons-round" style="font-size:16px;vertical-align:middle">auto_awesome</span> Generate Summary</button>
+                    <button id="saveNotesBtn" class="btn btn-small" style="flex:1"><span class="material-icons-round" style="font-size:16px;vertical-align:middle">save</span> Save Notes</button>
+                </div>
+            </div>
+
+            <!-- Breakout Rooms Panel -->
+            <div class="side-panel" id="breakoutPanel">
+                <div class="panel-header-bar">
+                    <h3>Breakout Rooms</h3>
+                    <button id="closeBreakoutBtn" class="icon-btn">✕</button>
+                </div>
+                <div id="breakoutSetup" style="display:none">
+                    <div id="breakoutRoomsList"></div>
+                    <button id="addBreakoutRoom" class="text-btn">+ Add room</button>
+                    <button id="startBreakoutBtn" class="btn btn-small" style="width:100%;margin-top:8px">Start Breakout</button>
+                </div>
+                <div id="breakoutActive" style="display:none">
+                    <div id="breakoutActiveList"></div>
+                    <button id="endBreakoutBtn" class="btn btn-small" style="width:100%;margin-top:8px;background:var(--red-500)">End Breakout</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Controls -->
+        <div class="call-controls">
+            <div class="controls-left">
+                <span class="room-info" id="roomInfo"></span>
+                <button id="copyLinkBtn" class="text-btn" title="Copy invite link"><span class="material-icons-round">content_copy</span> Copy link</button>
+                <span class="meeting-timer" id="meetingTimer">00:00</span>
+                <button id="viewToggleBtn" class="text-btn" title="Toggle view"><span class="material-icons-round">grid_view</span> <span id="viewToggleLabel">Gallery</span></button>
+            </div>
+            <div class="controls-center">
+                <button id="micBtn" class="ctrl-btn active" title="Toggle microphone">
+                    <span class="icon-on"><span class="material-icons-round">mic</span></span>
+                    <span class="icon-off"><span class="material-icons-round">mic_off</span></span>
+                </button>
+                <button id="camBtn" class="ctrl-btn active" title="Toggle camera">
+                    <span class="icon-on"><span class="material-icons-round">videocam</span></span>
+                    <span class="icon-off"><span class="material-icons-round">videocam_off</span></span>
+                </button>
+                <button id="screenBtn" class="ctrl-btn" title="Share screen">
+                    <span class="icon-on"><span class="material-icons-round">screen_share</span></span>
+                    <span class="icon-off"><span class="material-icons-round">stop_screen_share</span></span>
+                </button>
+                <button id="recordBtn" class="ctrl-btn" title="Record meeting">
+                    <span class="icon-on"><span class="material-icons-round">fiber_manual_record</span></span>
+                    <span class="icon-off"><span class="material-icons-round">stop_circle</span></span>
+                </button>
+
+                <!-- Reactions dropdown -->
+                <div class="ctrl-dropdown">
+                    <button id="reactBtn" class="ctrl-btn" title="Reactions">
+                        <span class="material-icons-round">sentiment_satisfied_alt</span>
+                    </button>
+                    <div class="dropdown-menu" id="reactionsMenu">
+                        <button class="reaction-btn" data-emoji="👍">👍</button>
+                        <button class="reaction-btn" data-emoji="👏">👏</button>
+                        <button class="reaction-btn" data-emoji="❤️">❤️</button>
+                        <button class="reaction-btn" data-emoji="😂">😂</button>
+                        <button class="reaction-btn" data-emoji="🎉">🎉</button>
+                        <button class="reaction-btn" data-emoji="🤔">🤔</button>
+                    </div>
+                </div>
+
+                <button id="handBtn" class="ctrl-btn" title="Raise hand">
+                    <span class="material-icons-round">pan_tool</span>
+                </button>
+
+                <button id="chatBtn" class="ctrl-btn" title="Toggle chat">
+                    <span class="icon-on"><span class="material-icons-round">chat</span></span>
+                    <span class="icon-off"><span class="material-icons-round">chat_bubble_outline</span></span>
+                </button>
+                <button id="participantsBtn" class="ctrl-btn" title="Participants">
+                    <span class="material-icons-round">people</span>
+                </button>
+
+                <button id="captionBtn" class="ctrl-btn" title="Toggle captions">
+                    <span class="material-icons-round">closed_caption_off</span>
+                </button>
+
+                <!-- More menu -->
+                <div class="ctrl-dropdown">
+                    <button id="moreBtn" class="ctrl-btn" title="More">
+                        <span class="material-icons-round">more_vert</span>
+                    </button>
+                    <div class="dropdown-menu dropdown-up" id="moreMenu">
+                        <button id="whiteboardBtn" class="dropdown-icon-btn" title="Whiteboard"><span class="material-icons-round">draw</span></button>
+                        <button id="pollsBtn" class="dropdown-icon-btn" title="Polls"><span class="material-icons-round">poll</span></button>
+                        <button id="breakoutBtn" class="dropdown-icon-btn" title="Breakout Rooms"><span class="material-icons-round">dashboard</span></button>
+                        <button id="notesBtn" class="dropdown-icon-btn" title="Meeting Notes"><span class="material-icons-round">description</span></button>
+                        <button id="filesBtn" class="dropdown-icon-btn" title="Share Files"><span class="material-icons-round">folder_shared</span></button>
+                        <button id="bgBlurBtn" class="dropdown-icon-btn" title="Background Blur"><span class="material-icons-round">blur_on</span></button>
+                        <button id="virtualBgBtn" class="dropdown-icon-btn" title="Virtual Background"><span class="material-icons-round">wallpaper</span></button>
+                        <button id="deviceSelectBtn" class="dropdown-icon-btn" title="Audio/Video Settings"><span class="material-icons-round">settings</span></button>
+                        <button id="shortcutsBtn" class="dropdown-icon-btn" title="Keyboard Shortcuts"><span class="material-icons-round">keyboard</span></button>
+                    </div>
+                </div>
+
+                <button id="leaveBtn" class="ctrl-btn leave" title="Leave call">
+                    <span class="material-icons-round">call_end</span>
+                </button>
+            </div>
+            <div class="controls-right">
+                <span class="peer-count" id="peerCount">1 participant</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Captions Overlay -->
+    <div id="captionsOverlay" class="captions-overlay" style="display:none">
+        <div id="captionsContent" class="captions-content"></div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <!-- Device Selector Modal -->
+    <div class="modal-overlay" id="deviceModal" style="display:none">
+        <div class="modal-card">
+            <div class="modal-header"><h3>Audio & Video Settings</h3><button class="icon-btn" id="closeDeviceModal">✕</button></div>
+            <div class="modal-body">
+                <label>Camera<select id="camSelect"></select></label>
+                <label>Microphone<select id="micSelect"></select></label>
+                <label>Speaker<select id="speakerSelect"></select></label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Virtual Background Modal -->
+    <div class="modal-overlay" id="vbgModal" style="display:none">
+        <div class="modal-card" style="max-width:600px">
+            <div class="modal-header"><h3>Virtual Background</h3><button class="icon-btn" id="closeVbgModal">✕</button></div>
+            <div class="modal-body vbg-body">
+                <div class="vbg-grid">
+                    <div class="vbg-option active" data-bg="none" title="None"><span class="material-icons-round">close</span><span>None</span></div>
+                    <div class="vbg-option" data-bg="blur" title="Blur"><span class="material-icons-round">blur_on</span><span>Blur</span></div>
+                </div>
+
+                <div class="vbg-category-label">Professional</div>
+                <div class="vbg-grid">
+                    <div class="vbg-option" data-bg="scene:office" title="Office"><div class="vbg-preview" id="vbgPreviewOffice"></div><span>Office</span></div>
+                    <div class="vbg-option" data-bg="scene:bookcase" title="Bookcase"><div class="vbg-preview" id="vbgPreviewBookcase"></div><span>Bookcase</span></div>
+                    <div class="vbg-option" data-bg="scene:coworking" title="Coworking"><div class="vbg-preview" id="vbgPreviewCoworking"></div><span>Coworking</span></div>
+                    <div class="vbg-option" data-bg="scene:executive" title="Executive"><div class="vbg-preview" id="vbgPreviewExecutive"></div><span>Executive</span></div>
+                    <div class="vbg-option" data-bg="scene:classroom" title="Classroom"><div class="vbg-preview" id="vbgPreviewClassroom"></div><span>Classroom</span></div>
+                </div>
+
+                <div class="vbg-category-label">Casual &amp; Social</div>
+                <div class="vbg-grid">
+                    <div class="vbg-option" data-bg="scene:livingroom" title="Living Room"><div class="vbg-preview" id="vbgPreviewLivingroom"></div><span>Living Room</span></div>
+                    <div class="vbg-option" data-bg="scene:coffeeshop" title="Coffee Shop"><div class="vbg-preview" id="vbgPreviewCoffeeshop"></div><span>Coffee Shop</span></div>
+                    <div class="vbg-option" data-bg="scene:nature" title="Nature"><div class="vbg-preview" id="vbgPreviewNature"></div><span>Nature</span></div>
+                    <div class="vbg-option" data-bg="scene:beach" title="Beach"><div class="vbg-preview" id="vbgPreviewBeach"></div><span>Beach</span></div>
+                    <div class="vbg-option" data-bg="scene:mountain" title="Mountain"><div class="vbg-preview" id="vbgPreviewMountain"></div><span>Mountain</span></div>
+                </div>
+
+                <div class="vbg-category-label">Creative &amp; Gradients</div>
+                <div class="vbg-grid">
+                    <div class="vbg-option" data-bg="scene:abstract" title="Abstract"><div class="vbg-preview" id="vbgPreviewAbstract"></div><span>Abstract</span></div>
+                    <div class="vbg-option" data-bg="scene:softgradient" title="Soft Gradient"><div class="vbg-preview" id="vbgPreviewSoftgradient"></div><span>Soft Gradient</span></div>
+                    <div class="vbg-option" data-bg="scene:city" title="City Night"><div class="vbg-preview" id="vbgPreviewCity"></div><span>City Night</span></div>
+                    <div class="vbg-option" data-bg="scene:skyline" title="Skyline"><div class="vbg-preview" id="vbgPreviewSkyline"></div><span>Skyline</span></div>
+                    <div class="vbg-option" data-bg="scene:warmtone" title="Warm Tone"><div class="vbg-preview" id="vbgPreviewWarmtone"></div><span>Warm Tone</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyboard Shortcuts Modal -->
+    <div class="modal-overlay" id="shortcutsModal" style="display:none">
+        <div class="modal-card">
+            <div class="modal-header"><h3>Keyboard Shortcuts</h3><button class="icon-btn" id="closeShortcutsModal">✕</button></div>
+            <div class="modal-body shortcuts-list">
+                <div class="shortcut-row"><kbd>M</kbd><span>Toggle microphone</span></div>
+                <div class="shortcut-row"><kbd>V</kbd><span>Toggle camera</span></div>
+                <div class="shortcut-row"><kbd>S</kbd><span>Toggle screen share</span></div>
+                <div class="shortcut-row"><kbd>H</kbd><span>Raise / lower hand</span></div>
+                <div class="shortcut-row"><kbd>C</kbd><span>Toggle chat</span></div>
+                <div class="shortcut-row"><kbd>R</kbd><span>Toggle recording</span></div>
+                <div class="shortcut-row"><kbd>G</kbd><span>Toggle gallery / speaker view</span></div>
+                <div class="shortcut-row"><kbd>F</kbd><span>Toggle fullscreen</span></div>
+                <div class="shortcut-row"><kbd>Esc</kbd><span>Leave call / close modal</span></div>
+                <div class="shortcut-row"><kbd>?</kbd><span>Show shortcuts</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

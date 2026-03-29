@@ -1,0 +1,65 @@
+{
+  "name": "huddle-desktop",
+  "version": "1.0.0",
+  "description": "Huddle - Simple, secure video calls",
+  "main": "desktop/main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.huddle.meet",
+    "productName": "Huddle",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "desktop/**/*",
+      "server.py",
+      "media_worker.js",
+      "static/**/*",
+      "requirements.txt",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "server.py",
+      "static/**/*",
+      "media_worker.js",
+      "requirements.txt"
+    ],
+    "extraResources": [],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.video"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Network"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "author": "Huddle",
+  "license": "MIT"
+}
