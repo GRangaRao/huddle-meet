@@ -3523,6 +3523,107 @@ function stopSpeechRecognition() {
         }
     }
 
+    function _calendarDates(meeting) {
+        const start = new Date(`${meeting.date}T${meeting.time}`);
+        const end = new Date(start.getTime() + (meeting.duration || 30) * 60000);
+        const fmt = d => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+        return { start, end, startStr: fmt(start), endStr: fmt(end) };
+    }
+
+    function openGoogleCalendar(meeting) {
+        const shareOrigin = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") ? "https://huddle-meet.onrender.com" : window.location.origin;
+        const inviteLink = `${shareOrigin}/room/${meeting.room_id}`;
+        const { startStr, endStr } = _calendarDates(meeting);
+        const passcodeInfo = meeting.passcodeEnabled && meeting.passcode ? `\nPasscode: ${meeting.passcode}` : "";
+        const details = `Join: ${inviteLink}${passcodeInfo}`;
+        const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(meeting.topic)}&dates=${startStr}/${endStr}&details=${encodeURIComponent(details)}`;
+        window.open(url, "_blank");
+    }
+
+    function downloadICS(meeting) {
+        const shareOrigin = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") ? "https://huddle-meet.onrender.com" : window.location.origin;
+        const inviteLink = `${shareOrigin}/room/${meeting.room_id}`;
+        const { startStr, endStr } = _calendarDates(meeting);
+        const passcodeInfo = meeting.passcodeEnabled && meeting.passcode ? `\\nPasscode: ${meeting.passcode}` : "";
+        const uid = `${meeting.id}@huddle-meet`;
+        const ics = [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//Huddle//Meet//EN",
+            "BEGIN:VEVENT",
+            `UID:${uid}`,
+            `DTSTART:${startStr}`,
+            `DTEND:${endStr}`,
+            `SUMMARY:${meeting.topic}`,
+            `DESCRIPTION:Join: ${inviteLink}${passcodeInfo}`,
+            `URL:${inviteLink}`,
+            "END:VEVENT",
+            "END:VCALENDAR"
+        ].join("\r\n");
+        const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `${meeting.topic.replace(/[^a-zA-Z0-9 ]/g, "").trim() || "meeting"}.ics`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    // ── Calendar helpers ──────────────────────────────────────────────────
+    function _meetingDateTime(m) {
+        const [y, mo, d] = m.date.split("-").map(Number);
+        const [h, mi] = m.time.split(":").map(Number);
+        const start = new Date(y, mo - 1, d, h, mi);
+        const end = new Date(start.getTime() + (m.duration || 30) * 60000);
+        return { start, end };
+    }
+    function _pad(n) { return String(n).padStart(2, "0"); }
+    function _gcalFmt(d) {
+        return `${d.getFullYear()}${_pad(d.getMonth()+1)}${_pad(d.getDate())}T${_pad(d.getHours())}${_pad(d.getMinutes())}00`;
+    }
+
+    function openGoogleCalendar(m) {
+        const { start, end } = _meetingDateTime(m);
+        const shareOrigin = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+            ? "https://huddle-meet.onrender.com" : window.location.origin;
+        const link = `${shareOrigin}/room/${m.room_id}`;
+        const params = new URLSearchParams({
+            action: "TEMPLATE",
+            text: m.topic || "Huddle Meeting",
+            dates: `${_gcalFmt(start)}/${_gcalFmt(end)}`,
+            details: `Join: ${link}${m.passcode ? "\nPasscode: " + m.passcode : ""}`,
+            location: link,
+        });
+        window.open(`https://calendar.google.com/calendar/render?${params}`, "_blank");
+    }
+
+    function downloadICS(m) {
+        const { start, end } = _meetingDateTime(m);
+        const shareOrigin = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+            ? "https://huddle-meet.onrender.com" : window.location.origin;
+        const link = `${shareOrigin}/room/${m.room_id}`;
+        const fmt = d => `${d.getFullYear()}${_pad(d.getMonth()+1)}${_pad(d.getDate())}T${_pad(d.getHours())}${_pad(d.getMinutes())}00`;
+        const ics = [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//Huddle//Meeting//EN",
+            "BEGIN:VEVENT",
+            `DTSTART:${fmt(start)}`,
+            `DTEND:${fmt(end)}`,
+            `SUMMARY:${(m.topic || "Huddle Meeting").replace(/[,;\\]/g, " ")}`,
+            `DESCRIPTION:Join: ${link}${m.passcode ? "\\nPasscode: " + m.passcode : ""}`,
+            `URL:${link}`,
+            `UID:${m.id}@huddle-meet`,
+            "END:VEVENT",
+            "END:VCALENDAR"
+        ].join("\r\n");
+        const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `${(m.topic || "meeting").replace(/[^a-zA-Z0-9]/g, "_")}.ics`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
     // Load and display scheduled meetings
     async function loadScheduledMeetings() {
         try {
@@ -3559,6 +3660,12 @@ function stopSpeechRecognition() {
                             <button class="btn-small smc-join" data-room="${m.room_id}" ${isPast ? 'disabled' : ''}>
                                 ${isLive ? 'Join Now' : 'Join'}
                             </button>
+                            <button class="icon-btn smc-gcal" data-meeting='${JSON.stringify(m).replace(/'/g, "&#39;")}' title="Add to Google Calendar">
+                                <span class="material-icons-round">event</span>
+                            </button>
+                            <button class="icon-btn smc-ics" data-meeting='${JSON.stringify(m).replace(/'/g, "&#39;")}' title="Download .ics (Outlook)">
+                                <span class="material-icons-round">download</span>
+                            </button>
                             <button class="icon-btn smc-copy" data-meeting='${JSON.stringify(m).replace(/'/g, "&#39;")}' title="Copy invite">
                                 <span class="material-icons-round">content_copy</span>
                             </button>
@@ -3577,6 +3684,16 @@ function stopSpeechRecognition() {
                 btn.addEventListener("click", () => {
                     const m = JSON.parse(btn.dataset.meeting);
                     showScheduleConfirmation(m);
+                });
+            });
+            scheduledContent.querySelectorAll(".smc-gcal").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    openGoogleCalendar(JSON.parse(btn.dataset.meeting));
+                });
+            });
+            scheduledContent.querySelectorAll(".smc-ics").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    downloadICS(JSON.parse(btn.dataset.meeting));
                 });
             });
             scheduledContent.querySelectorAll(".smc-delete").forEach(btn => {
