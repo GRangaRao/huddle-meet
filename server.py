@@ -40,12 +40,30 @@ FIREBASE_API_KEY = os.environ.get("FIREBASE_API_KEY", "")
 FIREBASE_AUTH_DOMAIN = os.environ.get("FIREBASE_AUTH_DOMAIN", f"{FIREBASE_PROJECT_ID}.firebaseapp.com" if FIREBASE_PROJECT_ID else "")
 SESSION_SECRET = os.environ.get("SESSION_SECRET", secrets.token_hex(32))
 CLOUD_BASE_URL = os.environ.get("CLOUD_BASE_URL", "https://huddle-meet.onrender.com")
+# Detect if we're the cloud instance (Render sets RENDER=true) or a local desktop
+IS_CLOUD = bool(os.environ.get("RENDER") or os.environ.get("IS_CLOUD"))
 
 # In-memory session store: { session_id: { "user": {...}, "created": timestamp } }
 auth_sessions: dict[str, dict] = {}
 # Cache for Google public keys (used to verify Firebase ID tokens)
 _google_certs: dict = {}
 _google_certs_expiry: float = 0
+
+
+async def sync_to_cloud(path: str, data: dict):
+    """Forward an API call to the cloud server (fire-and-forget)."""
+    if IS_CLOUD or not CLOUD_BASE_URL:
+        return
+    try:
+        async with aiohttp.ClientSession() as session:
+            url = f"{CLOUD_BASE_URL}{path}"
+            async with session.post(url, json=data, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status < 300:
+                    print(f"[cloud-sync] Synced {path} to cloud OK")
+                else:
+                    print(f"[cloud-sync] Sync {path} failed: {resp.status}")
+    except Exception as e:
+        print(f"[cloud-sync] Sync {path} error: {e}")
 
 # ── Database Pool ─────────────────────────────────────────────────────────
 db_pool = None
@@ -316,6 +334,30 @@ async def create_room(request):
     room_whiteboards[room_id] = []
     room_breakouts[room_id] = {"rooms": {}, "active": False}
     room_files[room_id] = []
+    # Sync room to cloud so invite links work
+    asyncio.ensure_future(sync_to_cloud("/api/create-room-with-id", {"room_id": room_id}))
+    return web.json_response({"room_id": room_id})
+
+
+async def create_room_with_id(request):
+    """Create a room with a specific ID (used for cloud sync from desktop)."""
+    data = await request.json()
+    room_id = data.get("room_id")
+    if not room_id:
+        return web.json_response({"error": "room_id required"}, status=400)
+    if room_id not in rooms:
+        rooms[room_id] = {}
+        room_meta[room_id] = {
+            "host": None,
+            "waiting_room_enabled": False,
+            "locked": False,
+            "created": datetime.utcnow().isoformat(),
+        }
+        waiting_rooms[room_id] = {}
+        room_polls[room_id] = []
+        room_whiteboards[room_id] = []
+        room_breakouts[room_id] = {"rooms": {}, "active": False}
+        room_files[room_id] = []
     return web.json_response({"room_id": room_id})
 
 
@@ -495,6 +537,10 @@ async def schedule_meeting(request):
                 meeting["autoRecord"], meeting["description"], meeting["createdBy"])
     else:
         scheduled_meetings[meeting_id] = meeting
+
+    # Sync schedule + room to cloud so invite links work for remote users
+    asyncio.ensure_future(sync_to_cloud("/api/create-room-with-id", {"room_id": room_id}))
+    asyncio.ensure_future(sync_to_cloud("/api/schedule", data))
 
     return web.json_response(meeting)
 
@@ -1244,6 +1290,7 @@ app.router.add_get("/api/auth/me", auth_me)
 app.router.add_get("/api/auth/config", auth_config)
 app.router.add_post("/api/auth/logout", auth_logout)
 app.router.add_post("/api/create-room", create_room)
+app.router.add_post("/api/create-room-with-id", create_room_with_id)
 app.router.add_get("/api/room/{room_id}", room_info)
 app.router.add_post("/api/schedule", schedule_meeting)
 app.router.add_get("/api/schedule", list_scheduled_meetings)
