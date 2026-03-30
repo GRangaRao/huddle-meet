@@ -143,6 +143,36 @@ room_whiteboards: dict[str, list] = {}
 room_breakouts: dict[str, dict] = {}
 # scheduled meetings fallback (in-memory when no PostgreSQL)
 scheduled_meetings: dict[str, dict] = {}
+
+# ── Local file persistence for scheduled meetings (desktop / no-DB mode) ──
+def _get_data_dir() -> Path:
+    """Get a writable data directory (user's AppData on Windows, ~/.huddle otherwise)."""
+    if os.name == "nt":
+        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+    else:
+        base = Path.home()
+    return base / ".huddle"
+
+_SCHEDULE_FILE = _get_data_dir() / "scheduled_meetings.json"
+
+def _load_scheduled_meetings():
+    """Load meetings from local JSON file at startup."""
+    if _SCHEDULE_FILE.exists():
+        try:
+            data = json.loads(_SCHEDULE_FILE.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                scheduled_meetings.update(data)
+                print(f"[persist] Loaded {len(data)} scheduled meeting(s) from disk")
+        except Exception as e:
+            print(f"[persist] Failed to load scheduled meetings: {e}")
+
+def _save_scheduled_meetings():
+    """Persist meetings to local JSON file."""
+    try:
+        _SCHEDULE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _SCHEDULE_FILE.write_text(json.dumps(scheduled_meetings, indent=2), encoding="utf-8")
+    except Exception as e:
+        print(f"[persist] Failed to save scheduled meetings: {e}")
 # shared files: { room_id: [ { id, name, size, type, data(bytes), uploader, uploaded_at } ] }
 room_files: dict[str, list] = {}
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB per file
@@ -547,6 +577,7 @@ async def schedule_meeting(request):
                 meeting["autoRecord"], meeting["description"], meeting["createdBy"])
     else:
         scheduled_meetings[meeting_id] = meeting
+        _save_scheduled_meetings()
 
     # Sync schedule + room to cloud so invite links work for remote users
     asyncio.ensure_future(sync_to_cloud("/api/create-room-with-id", {"room_id": room_id}))
@@ -601,6 +632,7 @@ async def delete_scheduled_meeting(request):
     else:
         if meeting_id in scheduled_meetings:
             scheduled_meetings.pop(meeting_id)
+            _save_scheduled_meetings()
             asyncio.ensure_future(sync_to_cloud(f"/api/schedule/{meeting_id}", method="DELETE"))
             return web.json_response({"ok": True})
         return web.json_response({"error": "Not found"}, status=404)
@@ -648,6 +680,7 @@ async def update_scheduled_meeting(request):
             if key in data:
                 meeting[key] = data[key]
         scheduled_meetings[meeting_id] = meeting
+        _save_scheduled_meetings()
         return web.json_response(meeting)
 
 
@@ -1262,6 +1295,10 @@ async def on_startup(app_instance):
     """Initialize database and start mediasoup worker."""
     global media_worker_process
     await init_db()
+
+    # Load persisted scheduled meetings (only when no database)
+    if not db_pool:
+        _load_scheduled_meetings()
 
     # Start the Node.js mediasoup worker
     try:
