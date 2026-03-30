@@ -485,8 +485,9 @@ async def delete_room_file(request):
 async def schedule_meeting(request):
     """Create a scheduled meeting."""
     data = await request.json()
-    meeting_id = uuid.uuid4().hex[:8]
-    room_id = uuid.uuid4().hex[:8]
+    # Accept pre-assigned IDs when synced from desktop, otherwise generate new
+    meeting_id = data.get("id") or uuid.uuid4().hex[:8]
+    room_id = data.get("room_id") or uuid.uuid4().hex[:8]
     # Pre-create the room
     rooms[room_id] = {}
     room_meta[room_id] = {
@@ -543,7 +544,7 @@ async def schedule_meeting(request):
 
     # Sync schedule + room to cloud so invite links work for remote users
     asyncio.ensure_future(sync_to_cloud("/api/create-room-with-id", {"room_id": room_id}))
-    asyncio.ensure_future(sync_to_cloud("/api/schedule", data))
+    asyncio.ensure_future(sync_to_cloud("/api/schedule", meeting))
 
     return web.json_response(meeting)
 
