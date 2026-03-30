@@ -1,13 +1,9 @@
 /* Huddle Video Call App - WebRTC Client (v2.1-firebase) */
 
 // ── Cloud URL for shareable links (desktop app runs on localhost) ─────────
-const CLOUD_BASE_URL = "https://huddle-meet.onrender.com";
+let _shareBaseUrl = "https://huddle-meet.onrender.com";
 function getShareableOrigin() {
-    const origin = window.location.origin;
-    if (origin.includes("localhost") || origin.includes("127.0.0.1")) {
-        return CLOUD_BASE_URL;
-    }
-    return origin;
+    return _shareBaseUrl;
 }
 
 // ── State ────────────────────────────────────────────────────────────────
@@ -154,6 +150,9 @@ async function checkAuthStatus() {
         const cfgResp = await fetch("/api/auth/config");
         if (cfgResp.ok) {
             const cfg = await cfgResp.json();
+            if (cfg.shareBaseUrl) {
+                _shareBaseUrl = cfg.shareBaseUrl;
+            }
             if (cfg.configured) {
                 window.HUDDLE_FIREBASE_CONFIG = cfg;
                 initFirebase();

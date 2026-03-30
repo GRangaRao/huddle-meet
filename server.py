@@ -39,6 +39,7 @@ FIREBASE_PROJECT_ID = os.environ.get("FIREBASE_PROJECT_ID", "")
 FIREBASE_API_KEY = os.environ.get("FIREBASE_API_KEY", "")
 FIREBASE_AUTH_DOMAIN = os.environ.get("FIREBASE_AUTH_DOMAIN", f"{FIREBASE_PROJECT_ID}.firebaseapp.com" if FIREBASE_PROJECT_ID else "")
 SESSION_SECRET = os.environ.get("SESSION_SECRET", secrets.token_hex(32))
+CLOUD_BASE_URL = os.environ.get("CLOUD_BASE_URL", "https://huddle-meet.onrender.com")
 
 # In-memory session store: { session_id: { "user": {...}, "created": timestamp } }
 auth_sessions: dict[str, dict] = {}
@@ -281,12 +282,13 @@ async def auth_logout(request):
 async def auth_config(request):
     """Return Firebase config for the frontend (public keys only)."""
     if not FIREBASE_API_KEY or not FIREBASE_PROJECT_ID:
-        return web.json_response({"configured": False})
+        return web.json_response({"configured": False, "shareBaseUrl": CLOUD_BASE_URL})
     return web.json_response({
         "configured": True,
         "apiKey": FIREBASE_API_KEY,
         "authDomain": FIREBASE_AUTH_DOMAIN,
         "projectId": FIREBASE_PROJECT_ID,
+        "shareBaseUrl": CLOUD_BASE_URL,
     })
 
 
