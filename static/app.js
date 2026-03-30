@@ -1,5 +1,15 @@
 /* Huddle Video Call App - WebRTC Client (v2.1-firebase) */
 
+// ── Cloud URL for shareable links (desktop app runs on localhost) ─────────
+const CLOUD_BASE_URL = "https://huddle-meet.onrender.com";
+function getShareableOrigin() {
+    const origin = window.location.origin;
+    if (origin.includes("localhost") || origin.includes("127.0.0.1")) {
+        return CLOUD_BASE_URL;
+    }
+    return origin;
+}
+
 // ── State ────────────────────────────────────────────────────────────────
 let ws = null;
 let localStream = null;
@@ -678,7 +688,7 @@ function setupCallControls() {
     });
 
     copyLinkBtn.addEventListener("click", () => {
-        const url = `${window.location.origin}/room/${roomId}`;
+        const url = `${getShareableOrigin()}/room/${roomId}`;
         navigator.clipboard.writeText(url).then(() => {
             showToast("Invite link copied!");
         }).catch(() => {
@@ -3494,7 +3504,7 @@ function stopSpeechRecognition() {
 
     // Show confirmation with invite link
     function showScheduleConfirmation(meeting) {
-        const baseUrl = window.location.origin;
+        const baseUrl = getShareableOrigin();
         const inviteLink = `${baseUrl}/room/${meeting.room_id}`;
         const dateStr = new Date(`${meeting.date}T${meeting.time}`).toLocaleString(undefined, {
             weekday: "long", year: "numeric", month: "long", day: "numeric",

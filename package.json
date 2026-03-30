@@ -1,6 +1,6 @@
 {
   "name": "huddle-desktop",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Huddle - Simple, secure video calls",
   "main": "desktop/main.js",
   "scripts": {
@@ -34,9 +34,10 @@
     "extraResources": [],
     "win": {
       "target": [
-        "nsis",
         "portable"
-      ]
+      ],
+      "icon": "desktop/icon.png",
+      "artifactName": "Huddle ${version}.exe"
     },
     "mac": {
       "target": [
