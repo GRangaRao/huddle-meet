@@ -55,18 +55,24 @@ async def sync_to_cloud(path: str, data: dict = None, method: str = "POST"):
     if IS_CLOUD or not CLOUD_BASE_URL:
         return
     try:
-        async with aiohttp.ClientSession() as session:
+        import ssl
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
+        connector = aiohttp.TCPConnector(ssl=ssl_ctx)
+        async with aiohttp.ClientSession(connector=connector, trust_env=False) as session:
             url = f"{CLOUD_BASE_URL}{path}"
-            kwargs = {"timeout": aiohttp.ClientTimeout(total=10)}
+            kwargs = {"timeout": aiohttp.ClientTimeout(total=15)}
             if data is not None:
                 kwargs["json"] = data
             async with session.request(method, url, **kwargs) as resp:
+                body = await resp.text()
                 if resp.status < 300:
                     print(f"[cloud-sync] Synced {method} {path} to cloud OK")
                 else:
-                    print(f"[cloud-sync] Sync {method} {path} failed: {resp.status}")
+                    print(f"[cloud-sync] Sync {method} {path} failed: {resp.status} {body}")
     except Exception as e:
-        print(f"[cloud-sync] Sync {method} {path} error: {e}")
+        print(f"[cloud-sync] Sync {method} {path} error: {type(e).__name__}: {e}")
 
 # ── Database Pool ─────────────────────────────────────────────────────────
 db_pool = None
