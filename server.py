@@ -68,11 +68,11 @@ async def sync_to_cloud(path: str, data: dict = None, method: str = "POST"):
             async with session.request(method, url, **kwargs) as resp:
                 body = await resp.text()
                 if resp.status < 300:
-                    print(f"[cloud-sync] Synced {method} {path} to cloud OK")
+                    print(f"[cloud-sync] Synced {method} {path} to cloud OK", flush=True)
                 else:
-                    print(f"[cloud-sync] Sync {method} {path} failed: {resp.status} {body}")
+                    print(f"[cloud-sync] Sync {method} {path} failed: {resp.status} {body}", flush=True)
     except Exception as e:
-        print(f"[cloud-sync] Sync {method} {path} error: {type(e).__name__}: {e}")
+        print(f"[cloud-sync] Sync {method} {path} error: {type(e).__name__}: {e}", flush=True)
 
 # ── Database Pool ─────────────────────────────────────────────────────────
 db_pool = None
