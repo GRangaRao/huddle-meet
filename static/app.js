@@ -687,7 +687,8 @@ function setupCallControls() {
     });
 
     copyLinkBtn.addEventListener("click", () => {
-        const url = `${getShareableOrigin()}/room/${roomId}`;
+        const shareOrigin = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") ? "https://huddle-meet.onrender.com" : window.location.origin;
+        const url = `${shareOrigin}/room/${roomId}`;
         navigator.clipboard.writeText(url).then(() => {
             showToast("Invite link copied!");
         }).catch(() => {
@@ -3503,8 +3504,8 @@ function stopSpeechRecognition() {
 
     // Show confirmation with invite link
     function showScheduleConfirmation(meeting) {
-        const baseUrl = getShareableOrigin();
-        const inviteLink = `${baseUrl}/room/${meeting.room_id}`;
+        const shareOrigin = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") ? "https://huddle-meet.onrender.com" : window.location.origin;
+        const inviteLink = `${shareOrigin}/room/${meeting.room_id}`;
         const dateStr = new Date(`${meeting.date}T${meeting.time}`).toLocaleString(undefined, {
             weekday: "long", year: "numeric", month: "long", day: "numeric",
             hour: "2-digit", minute: "2-digit"

@@ -1,6 +1,6 @@
 {
   "name": "huddle-desktop",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "Huddle - Simple, secure video calls",
   "main": "desktop/main.js",
   "scripts": {
