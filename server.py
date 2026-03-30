@@ -50,20 +50,23 @@ _google_certs: dict = {}
 _google_certs_expiry: float = 0
 
 
-async def sync_to_cloud(path: str, data: dict):
+async def sync_to_cloud(path: str, data: dict = None, method: str = "POST"):
     """Forward an API call to the cloud server (fire-and-forget)."""
     if IS_CLOUD or not CLOUD_BASE_URL:
         return
     try:
         async with aiohttp.ClientSession() as session:
             url = f"{CLOUD_BASE_URL}{path}"
-            async with session.post(url, json=data, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            kwargs = {"timeout": aiohttp.ClientTimeout(total=10)}
+            if data is not None:
+                kwargs["json"] = data
+            async with session.request(method, url, **kwargs) as resp:
                 if resp.status < 300:
-                    print(f"[cloud-sync] Synced {path} to cloud OK")
+                    print(f"[cloud-sync] Synced {method} {path} to cloud OK")
                 else:
-                    print(f"[cloud-sync] Sync {path} failed: {resp.status}")
+                    print(f"[cloud-sync] Sync {method} {path} failed: {resp.status}")
     except Exception as e:
-        print(f"[cloud-sync] Sync {path} error: {e}")
+        print(f"[cloud-sync] Sync {method} {path} error: {e}")
 
 # ── Database Pool ─────────────────────────────────────────────────────────
 db_pool = None
@@ -585,11 +588,13 @@ async def delete_scheduled_meeting(request):
                 "DELETE FROM scheduled_meetings WHERE id=$1", meeting_id
             )
             if result == "DELETE 1":
+                asyncio.ensure_future(sync_to_cloud(f"/api/schedule/{meeting_id}", method="DELETE"))
                 return web.json_response({"ok": True})
             return web.json_response({"error": "Not found"}, status=404)
     else:
         if meeting_id in scheduled_meetings:
             scheduled_meetings.pop(meeting_id)
+            asyncio.ensure_future(sync_to_cloud(f"/api/schedule/{meeting_id}", method="DELETE"))
             return web.json_response({"ok": True})
         return web.json_response({"error": "Not found"}, status=404)
 
