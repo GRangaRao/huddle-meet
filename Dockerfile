@@ -33,11 +33,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY --from=mediasoup-builder /build/node_modules ./node_modules
 COPY --from=mediasoup-builder /build/package.json ./package.json
 
-# Application code — force fresh copy every deploy
-ARG CACHE_BUST=v4
+# Application code — force fresh copy every deploy (2026-04-01)
 COPY server.py .
 COPY media_worker.js .
-COPY static/ static/
+COPY static/ ./static/
 
 # Port defaults (overridden by platform env vars)
 ENV PORT=10000
