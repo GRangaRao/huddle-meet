@@ -974,22 +974,74 @@ function toggleMic() {
     updateParticipantList();
 }
 
-function toggleCam() {
+async function toggleCam() {
     camEnabled = !camEnabled;
     camBtn.classList.toggle("active", camEnabled);
-    if (localStream) {
-        localStream.getVideoTracks().forEach(t => t.enabled = camEnabled);
-    }
-    // Pause/resume mediasoup video producer
-    if (videoProducer) {
-        if (camEnabled) videoProducer.resume();
-        else videoProducer.pause();
-        ws.send(JSON.stringify({
-            action: "pause-producer",
-            producerId: videoProducer.id,
-            kind: "video",
-            paused: !camEnabled,
-        }));
+
+    if (camEnabled) {
+        // If localStream has no video track, acquire one
+        const existingVideo = localStream ? localStream.getVideoTracks() : [];
+        if (existingVideo.length === 0) {
+            try {
+                const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const newTrack = camStream.getVideoTracks()[0];
+                if (localStream) {
+                    localStream.addTrack(newTrack);
+                } else {
+                    localStream = camStream;
+                }
+                localVideo.srcObject = localStream;
+                // Create mediasoup video producer if in a call
+                if (sendTransport && !videoProducer) {
+                    try {
+                        videoProducer = await sendTransport.produce({
+                            track: newTrack,
+                            encodings: [
+                                { maxBitrate: 100000 },
+                                { maxBitrate: 300000 },
+                                { maxBitrate: 900000 },
+                            ],
+                            codecOptions: { videoGoogleStartBitrate: 1000 },
+                        });
+                        console.log("[ms] Video producer created on toggle:", videoProducer.id);
+                    } catch (e) {
+                        console.error("[ms] Video produce on toggle failed:", e);
+                    }
+                }
+            } catch (e) {
+                console.warn("Could not access camera:", e);
+                camEnabled = false;
+                camBtn.classList.toggle("active", false);
+                showToast("Camera not available");
+            }
+        } else {
+            existingVideo.forEach(t => t.enabled = true);
+        }
+        // Resume existing producer
+        if (videoProducer && videoProducer.paused) {
+            videoProducer.resume();
+            ws.send(JSON.stringify({
+                action: "pause-producer",
+                producerId: videoProducer.id,
+                kind: "video",
+                paused: false,
+            }));
+        }
+    } else {
+        // Disable video tracks
+        if (localStream) {
+            localStream.getVideoTracks().forEach(t => t.enabled = false);
+        }
+        // Pause mediasoup video producer
+        if (videoProducer) {
+            videoProducer.pause();
+            ws.send(JSON.stringify({
+                action: "pause-producer",
+                producerId: videoProducer.id,
+                kind: "video",
+                paused: true,
+            }));
+        }
     }
     localVideoOff.style.display = camEnabled ? "none" : "";
 }
