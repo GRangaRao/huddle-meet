@@ -1,4 +1,4 @@
-/* Huddle Video Call App - WebRTC Client (v2.1-firebase) */
+/* Huddle Video Call App - WebRTC Client (v2.2-calendar) */
 
 // ── Cloud URL for shareable links (desktop app runs on localhost) ─────────
 let _shareBaseUrl = "https://huddle-meet.onrender.com";

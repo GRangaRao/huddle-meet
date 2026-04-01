@@ -351,6 +351,10 @@ async def auth_config(request):
 
 # ── HTTP Routes ───────────────────────────────────────────────────────────
 
+async def version_check(request):
+    return web.json_response({"version": "2.2-calendar", "deployed": True})
+
+
 async def index(request):
     return web.FileResponse(STATIC_DIR / "index.html")
 
@@ -1333,6 +1337,7 @@ app = web.Application()
 app.on_startup.append(on_startup)
 app.on_shutdown.append(on_shutdown)
 app.router.add_get("/", index)
+app.router.add_get("/api/version", version_check)
 app.router.add_get("/room/{room_id}", room_page)
 app.router.add_post("/api/auth/firebase", auth_firebase)
 app.router.add_get("/api/auth/me", auth_me)
