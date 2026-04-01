@@ -34,6 +34,12 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "")
 MEDIA_WORKER_PORT = int(os.environ.get("MEDIA_WORKER_PORT", "3000"))
 MEDIA_WORKER_URL = f"http://127.0.0.1:{MEDIA_WORKER_PORT}"
 
+# ── GitHub-backed flat-file persistence ────────────────────────────────────
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+GITHUB_REPO = os.environ.get("GITHUB_REPO", "GRangaRao/huddle-meet")
+GITHUB_MEETINGS_PATH = "data/scheduled_meetings.json"
+_github_file_sha: str = ""  # track SHA for updates
+
 # ── Firebase Auth Config ──────────────────────────────────────────────────
 FIREBASE_PROJECT_ID = os.environ.get("FIREBASE_PROJECT_ID", "")
 FIREBASE_API_KEY = os.environ.get("FIREBASE_API_KEY", "")
@@ -173,6 +179,63 @@ def _save_scheduled_meetings():
         _SCHEDULE_FILE.write_text(json.dumps(scheduled_meetings, indent=2), encoding="utf-8")
     except Exception as e:
         print(f"[persist] Failed to save scheduled meetings: {e}")
+
+
+# ── GitHub flat-file cloud persistence ────────────────────────────────────
+import base64
+
+async def _github_load_meetings():
+    """Load meetings from GitHub repo flat file on startup."""
+    global _github_file_sha
+    if not GITHUB_TOKEN:
+        print("[github] No GITHUB_TOKEN set — skipping GitHub persistence")
+        return
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_MEETINGS_PATH}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status == 200:
+                    result = await resp.json()
+                    _github_file_sha = result["sha"]
+                    content = base64.b64decode(result["content"]).decode("utf-8")
+                    data = json.loads(content)
+                    if isinstance(data, dict):
+                        scheduled_meetings.update(data)
+                        print(f"[github] Loaded {len(data)} meeting(s) from GitHub")
+                elif resp.status == 404:
+                    print("[github] No meetings file found in repo — will create on first save")
+                else:
+                    print(f"[github] Failed to load meetings: HTTP {resp.status}")
+    except Exception as e:
+        print(f"[github] Load error: {type(e).__name__}: {e}")
+
+
+async def _github_save_meetings():
+    """Save meetings to GitHub repo flat file (fire-and-forget)."""
+    global _github_file_sha
+    if not GITHUB_TOKEN:
+        return
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_MEETINGS_PATH}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+    content_b64 = base64.b64encode(json.dumps(scheduled_meetings, indent=2).encode("utf-8")).decode("utf-8")
+    body = {"message": "Update scheduled meetings", "content": content_b64}
+    if _github_file_sha:
+        body["sha"] = _github_file_sha
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.put(url, headers=headers, json=body, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status in (200, 201):
+                    result = await resp.json()
+                    _github_file_sha = result["content"]["sha"]
+                    print(f"[github] Saved {len(scheduled_meetings)} meeting(s) to GitHub")
+                else:
+                    text = await resp.text()
+                    print(f"[github] Save failed: HTTP {resp.status} {text}")
+    except Exception as e:
+        print(f"[github] Save error: {type(e).__name__}: {e}")
+
+
 # shared files: { room_id: [ { id, name, size, type, data(bytes), uploader, uploaded_at } ] }
 room_files: dict[str, list] = {}
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB per file
@@ -582,6 +645,7 @@ async def schedule_meeting(request):
     else:
         scheduled_meetings[meeting_id] = meeting
         _save_scheduled_meetings()
+        asyncio.ensure_future(_github_save_meetings())
 
     # Sync schedule + room to cloud so invite links work for remote users
     asyncio.ensure_future(sync_to_cloud("/api/create-room-with-id", {"room_id": room_id}))
@@ -637,6 +701,7 @@ async def delete_scheduled_meeting(request):
         if meeting_id in scheduled_meetings:
             scheduled_meetings.pop(meeting_id)
             _save_scheduled_meetings()
+            asyncio.ensure_future(_github_save_meetings())
             asyncio.ensure_future(sync_to_cloud(f"/api/schedule/{meeting_id}", method="DELETE"))
             return web.json_response({"ok": True})
         return web.json_response({"error": "Not found"}, status=404)
@@ -685,6 +750,7 @@ async def update_scheduled_meeting(request):
                 meeting[key] = data[key]
         scheduled_meetings[meeting_id] = meeting
         _save_scheduled_meetings()
+        asyncio.ensure_future(_github_save_meetings())
         return web.json_response(meeting)
 
 
@@ -1303,6 +1369,7 @@ async def on_startup(app_instance):
     # Load persisted scheduled meetings (only when no database)
     if not db_pool:
         _load_scheduled_meetings()
+        await _github_load_meetings()
 
     # Start the Node.js mediasoup worker
     try:
