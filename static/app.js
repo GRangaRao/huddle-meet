@@ -3514,7 +3514,8 @@ function stopSpeechRecognition() {
             ? `\nPasscode: ${meeting.passcode}` : "";
 
         const organiserInfo = meeting.createdBy ? `\nOrganised by: ${meeting.createdBy}` : '';
-        const inviteText = `Huddle Meeting\n\nTopic: ${meeting.topic}\nTime: ${dateStr}\nDuration: ${meeting.duration} min${organiserInfo}\n\nJoin: ${inviteLink}${passcodeInfo}`;
+        const agendaInfo = meeting.description ? `\n\nAgenda:\n${meeting.description}` : '';
+        const inviteText = `Huddle Meeting\n\nTopic: ${meeting.topic}\nTime: ${dateStr}\nDuration: ${meeting.duration} min${organiserInfo}${agendaInfo}\n\nJoin: ${inviteLink}${passcodeInfo}`;
 
         if (navigator.clipboard) {
             navigator.clipboard.writeText(inviteText).then(() => {
@@ -3535,7 +3536,8 @@ function stopSpeechRecognition() {
         const inviteLink = `${shareOrigin}/room/${meeting.room_id}`;
         const { startStr, endStr } = _calendarDates(meeting);
         const passcodeInfo = meeting.passcodeEnabled && meeting.passcode ? `\nPasscode: ${meeting.passcode}` : "";
-        const details = `Join: ${inviteLink}${passcodeInfo}`;
+        const agendaInfo = meeting.description ? `\n\nAgenda:\n${meeting.description}` : '';
+        const details = `Join: ${inviteLink}${passcodeInfo}${agendaInfo}`;
         const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(meeting.topic)}&dates=${startStr}/${endStr}&details=${encodeURIComponent(details)}`;
         window.open(url, "_blank");
     }
@@ -3545,6 +3547,7 @@ function stopSpeechRecognition() {
         const inviteLink = `${shareOrigin}/room/${meeting.room_id}`;
         const { startStr, endStr } = _calendarDates(meeting);
         const passcodeInfo = meeting.passcodeEnabled && meeting.passcode ? `\\nPasscode: ${meeting.passcode}` : "";
+        const agendaInfo = meeting.description ? `\\n\\nAgenda:\\n${meeting.description.replace(/\n/g, '\\n')}` : '';
         const uid = `${meeting.id}@huddle-meet`;
         const ics = [
             "BEGIN:VCALENDAR",
@@ -3555,7 +3558,7 @@ function stopSpeechRecognition() {
             `DTSTART:${startStr}`,
             `DTEND:${endStr}`,
             `SUMMARY:${meeting.topic}`,
-            `DESCRIPTION:Join: ${inviteLink}${passcodeInfo}`,
+            `DESCRIPTION:Join: ${inviteLink}${passcodeInfo}${agendaInfo}`,
             `URL:${inviteLink}`,
             "END:VEVENT",
             "END:VCALENDAR"
