@@ -34,7 +34,7 @@ COPY --from=mediasoup-builder /build/node_modules ./node_modules
 COPY --from=mediasoup-builder /build/package.json ./package.json
 
 # Application code — force fresh copy every deploy
-ARG CACHE_BUST=v3
+ARG CACHE_BUST=v4
 COPY server.py .
 COPY media_worker.js .
 COPY static/ static/
