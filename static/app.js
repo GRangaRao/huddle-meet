@@ -3738,6 +3738,9 @@ function stopSpeechRecognition() {
                             <button class="icon-btn smc-copy" data-meeting='${JSON.stringify(m).replace(/'/g, "&#39;")}' title="Copy invite">
                                 <span class="material-icons-round">content_copy</span>
                             </button>
+                            <button class="icon-btn smc-edit" data-meeting='${JSON.stringify(m).replace(/'/g, "&#39;")}' title="Edit">
+                                <span class="material-icons-round">edit</span>
+                            </button>
                             <button class="icon-btn smc-delete" data-id="${m.id}" title="Delete">
                                 <span class="material-icons-round">delete_outline</span>
                             </button>
@@ -3765,6 +3768,12 @@ function stopSpeechRecognition() {
                     downloadICS(JSON.parse(btn.dataset.meeting));
                 });
             });
+            scheduledContent.querySelectorAll(".smc-edit").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const m = JSON.parse(btn.dataset.meeting);
+                    openEditScheduleModal(m);
+                });
+            });
             scheduledContent.querySelectorAll(".smc-delete").forEach(btn => {
                 btn.addEventListener("click", async () => {
                     await fetch(`/api/schedule/${btn.dataset.id}`, { method: "DELETE" });
@@ -3776,6 +3785,109 @@ function stopSpeechRecognition() {
             console.error("Failed to load scheduled meetings:", e);
         }
     }
+
+    // ── Edit scheduled meeting ──────────────────────────────────────────
+    let editingMeetingId = null;
+
+    function openEditScheduleModal(m) {
+        editingMeetingId = m.id;
+        document.getElementById("schTopic").value = m.topic || "";
+        document.getElementById("schDate").value = m.date || "";
+        document.getElementById("schTime").value = m.time || "";
+        document.getElementById("schDuration").value = m.duration || 30;
+        if (m.timezone) schTimezone.value = m.timezone;
+        schRecurring.checked = !!m.recurring;
+        schRecurringOptions.style.display = m.recurring ? "" : "none";
+        if (m.recurrence) document.getElementById("schRecurrence").value = m.recurrence;
+        if (m.endDate) document.getElementById("schEndDate").value = m.endDate;
+        schPasscode.checked = m.passcodeEnabled !== false;
+        schPasscodeGroup.style.display = schPasscode.checked ? "" : "none";
+        document.getElementById("schPasscodeInput").value = m.passcode || "";
+        document.getElementById("schWaitingRoom").checked = !!m.waitingRoom;
+        const hostVideoOn = document.querySelector('input[name="schHostVideo"][value="on"]');
+        const hostVideoOff = document.querySelector('input[name="schHostVideo"][value="off"]');
+        if (m.hostVideo === "off" && hostVideoOff) hostVideoOff.checked = true;
+        else if (hostVideoOn) hostVideoOn.checked = true;
+        const partVideoOn = document.querySelector('input[name="schParticipantVideo"][value="on"]');
+        const partVideoOff = document.querySelector('input[name="schParticipantVideo"][value="off"]');
+        if (m.participantVideo === "off" && partVideoOff) partVideoOff.checked = true;
+        else if (partVideoOn) partVideoOn.checked = true;
+        document.getElementById("schMuteOnEntry").checked = m.muteOnEntry !== false;
+        document.getElementById("schAutoRecord").checked = !!m.autoRecord;
+        document.getElementById("schDescription").value = m.description || "";
+
+        schSaveBtn.innerHTML = '<span class="material-icons-round">save</span> Update';
+        scheduleModal.style.display = "flex";
+        document.getElementById("schTopic").focus();
+    }
+
+    // Patch Save button to handle both create and update
+    const origSaveHandler = schSaveBtn.onclick;
+    schSaveBtn.addEventListener("click", async (e) => {
+        if (!editingMeetingId) return; // let the existing handler run for new meetings
+        e.stopImmediatePropagation();
+
+        const topic = document.getElementById("schTopic").value.trim() || "Untitled Meeting";
+        const date = document.getElementById("schDate").value;
+        const time = document.getElementById("schTime").value;
+        const duration = document.getElementById("schDuration").value;
+        const timezone = schTimezone.value;
+        const recurring = schRecurring.checked;
+        const recurrence = document.getElementById("schRecurrence").value;
+        const endDate = document.getElementById("schEndDate").value;
+        const passcodeEnabled = schPasscode.checked;
+        const passcode = document.getElementById("schPasscodeInput").value.trim();
+        const waitingRoom = document.getElementById("schWaitingRoom").checked;
+        const hostVideo = document.querySelector('input[name="schHostVideo"]:checked').value;
+        const participantVideo = document.querySelector('input[name="schParticipantVideo"]:checked').value;
+        const muteOnEntry = document.getElementById("schMuteOnEntry").checked;
+        const autoRecord = document.getElementById("schAutoRecord").checked;
+        const description = document.getElementById("schDescription").value.trim();
+
+        if (!date || !time) { showToast("Please select date and time"); return; }
+
+        schSaveBtn.disabled = true;
+        schSaveBtn.textContent = "Updating...";
+
+        try {
+            const resp = await fetch(`/api/schedule/${editingMeetingId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    topic, date, time, duration, timezone, recurring, recurrence,
+                    endDate, passcodeEnabled, passcode, waitingRoom, hostVideo,
+                    participantVideo, muteOnEntry, autoRecord, description,
+                }),
+            });
+            if (resp.ok) {
+                showToast("Meeting updated!");
+                scheduleModal.style.display = "none";
+                loadScheduledMeetings();
+            } else {
+                showToast("Failed to update meeting");
+            }
+        } catch (err) {
+            showToast("Failed to update meeting");
+        } finally {
+            editingMeetingId = null;
+            schSaveBtn.disabled = false;
+            schSaveBtn.innerHTML = '<span class="material-icons-round">event_available</span> Schedule';
+        }
+    }, true); // useCapture=true to run before the create handler
+
+    // Reset editingMeetingId when opening for a new meeting
+    scheduleBtn.addEventListener("click", () => {
+        editingMeetingId = null;
+        schSaveBtn.innerHTML = '<span class="material-icons-round">event_available</span> Schedule';
+    });
+
+    // Reset on modal close
+    function resetEditState() {
+        editingMeetingId = null;
+        schSaveBtn.innerHTML = '<span class="material-icons-round">event_available</span> Schedule';
+    }
+    closeScheduleModal.addEventListener("click", resetEditState);
+    schCancelBtn.addEventListener("click", resetEditState);
 
     // Load on startup
     loadScheduledMeetings();
