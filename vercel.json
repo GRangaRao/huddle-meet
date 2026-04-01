@@ -1,0 +1,17 @@
+{
+  "buildCommand": null,
+  "outputDirectory": "static",
+  "framework": null,
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "https://huddle-meet.onrender.com/api/$1" },
+    { "source": "/socket.io/(.*)", "destination": "https://huddle-meet.onrender.com/socket.io/$1" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache" }
+      ]
+    }
+  ]
+}

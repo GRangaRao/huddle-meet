@@ -236,22 +236,21 @@ function showGoogleButton() {
 // ── Camera Preview ───────────────────────────────────────────────────────
 async function startPreview() {
     try {
+        // Only acquire audio on page load — camera stays off until user toggles it
         localStream = await navigator.mediaDevices.getUserMedia({
-            video: true,
+            video: false,
             audio: {
                 echoCancellation: true,
                 noiseSuppression: true,
                 autoGainControl: true,
             },
         });
-        previewVideo.srcObject = localStream;
-        previewVideo.muted = true; // Always mute local preview
-        // Default camera off
-        localStream.getVideoTracks().forEach(t => t.enabled = false);
+        previewVideo.muted = true;
         previewPlaceholder.style.display = "flex";
         previewCam.classList.remove("active");
+        camEnabled = false;
     } catch (e) {
-        console.warn("Could not access camera/mic:", e);
+        console.warn("Could not access mic:", e);
         previewPlaceholder.querySelector("p").textContent = "Camera not available";
     }
 }
@@ -266,13 +265,28 @@ function setupJoinListeners() {
         }
     });
 
-    previewCam.addEventListener("click", () => {
+    previewCam.addEventListener("click", async () => {
         camEnabled = !camEnabled;
         previewCam.classList.toggle("active", camEnabled);
-        if (localStream) {
-            localStream.getVideoTracks().forEach(t => t.enabled = camEnabled);
+        if (camEnabled) {
+            try {
+                const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const videoTrack = videoStream.getVideoTracks()[0];
+                // Remove any existing video tracks
+                localStream.getVideoTracks().forEach(t => { t.stop(); localStream.removeTrack(t); });
+                localStream.addTrack(videoTrack);
+                previewVideo.srcObject = localStream;
+                previewPlaceholder.style.display = "none";
+            } catch (e) {
+                console.warn("Could not access camera:", e);
+                camEnabled = false;
+                previewCam.classList.remove("active");
+                showToast("Camera not available");
+            }
+        } else {
+            localStream.getVideoTracks().forEach(t => { t.stop(); localStream.removeTrack(t); });
+            previewPlaceholder.style.display = "flex";
         }
-        previewPlaceholder.style.display = camEnabled ? "none" : "flex";
     });
 
     newMeetingBtn.addEventListener("click", async () => {
@@ -313,10 +327,10 @@ function joinRoom(id) {
     myName = nameInput.value.trim() || "Guest";
     localStorage.setItem("huddle_name", myName);
 
-    // Ensure we have a stream
+    // Ensure we have a stream with audio; add video only if camera was toggled on
     if (!localStream) {
         navigator.mediaDevices.getUserMedia({
-            video: true,
+            video: camEnabled,
             audio: {
                 echoCancellation: true,
                 noiseSuppression: true,

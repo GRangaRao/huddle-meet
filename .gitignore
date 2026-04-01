@@ -16,3 +16,5 @@ firebase-debug.log
 *.docx
 cache/
 downloads/
+.vercel
+.env*.local
