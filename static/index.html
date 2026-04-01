@@ -20,7 +20,6 @@
                 <div class="logo"><span class="material-icons-round">videocam</span></div>
                 <h1>Huddle</h1>
                 <p class="subtitle">Simple, secure video calls in your browser</p>
-                <p class="subline">No downloads · Join in seconds</p>
 
                 <!-- Auth section -->
                 <div id="authSection" class="auth-section">
@@ -44,7 +43,17 @@
                 <div class="join-left">
                     <div class="join-card">
                         <div class="preview-section">
-                            <span class="preview-label">Camera preview</span>
+                            <div class="preview-header">
+                                <span class="preview-label">Camera preview</span>
+                                <div class="action-buttons">
+                                    <button id="newMeetingBtn" class="btn btn-primary btn-sm">
+                                        <span class="material-icons-round">video_call</span> Meet
+                                    </button>
+                                    <button id="scheduleMeetingBtn" class="btn btn-outline btn-sm">
+                                        <span class="material-icons-round">calendar_month</span> Schedule
+                                    </button>
+                                </div>
+                            </div>
                             <div class="preview-container">
                                 <video id="previewVideo" autoplay muted playsinline></video>
                                 <div class="preview-placeholder" id="previewPlaceholder">
@@ -70,14 +79,6 @@
                         </div>
 
                         <div class="join-actions">
-                            <div class="action-buttons">
-                                <button id="newMeetingBtn" class="btn btn-primary">
-                                    <span class="material-icons-round">video_call</span> New meeting
-                                </button>
-                                <button id="scheduleMeetingBtn" class="btn btn-outline">
-                                    <span class="material-icons-round">calendar_month</span> Schedule
-                                </button>
-                            </div>
                             <div class="divider"><span>or</span></div>
                             <div class="join-code-section">
                                 <span class="join-code-label">Have a code?</span>
