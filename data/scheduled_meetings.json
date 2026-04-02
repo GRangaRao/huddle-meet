@@ -1,1 +1,24 @@
-{}
+{
+  "4840dcec": {
+    "id": "4840dcec",
+    "room_id": "6003b43c",
+    "topic": "Untitled Meeting",
+    "date": "2026-04-02",
+    "time": "15:00",
+    "duration": 30,
+    "timezone": "Etc/GMT-1",
+    "recurring": false,
+    "recurrence": "weekly",
+    "endDate": "",
+    "passcodeEnabled": true,
+    "passcode": "661tb4",
+    "waitingRoom": false,
+    "hostVideo": "on",
+    "participantVideo": "on",
+    "muteOnEntry": true,
+    "autoRecord": false,
+    "description": "",
+    "createdAt": "2026-04-02T13:37:32.536902",
+    "createdBy": "Ranga Galla"
+  }
+}
