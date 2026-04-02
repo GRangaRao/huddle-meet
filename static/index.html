@@ -13,6 +13,21 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 </head>
 <body>
+
+<!-- ── PIN Auth Overlay ───────────────────────────────────────── -->
+<div id="pinOverlay" class="pin-overlay">
+    <div class="pin-card">
+        <div class="pin-icon">🔒</div>
+        <h2>Enter Access Code</h2>
+        <p>Huddle is currently in private preview.</p>
+        <div class="pin-input-row">
+            <input type="text" id="pinInput" maxlength="4" placeholder="····" autocomplete="off" autofocus>
+        </div>
+        <button class="pin-submit" onclick="checkPin()">Unlock</button>
+        <p id="pinError" class="pin-error"></p>
+    </div>
+</div>
+
     <!-- Landing / Join Screen -->
     <div id="joinScreen" class="screen active">
         <div class="join-container">
@@ -573,6 +588,46 @@
         </div>
     </div>
 
+    <script>
+    (async function() {
+        var overlay = document.getElementById('pinOverlay');
+        var stored = localStorage.getItem('huddle_pin_token');
+        if (stored) {
+            try {
+                var r = await fetch('/api/pin/check', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({token: stored})
+                });
+                var d = await r.json();
+                if (d.ok) { overlay.style.display = 'none'; return; }
+            } catch(e) {}
+            localStorage.removeItem('huddle_pin_token');
+        }
+    })();
+    function checkPin() {
+        var pin = document.getElementById('pinInput').value.trim();
+        fetch('/api/pin/verify', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({pin: pin})
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            if (d.ok) {
+                localStorage.setItem('huddle_pin_token', d.token);
+                document.getElementById('pinOverlay').style.display = 'none';
+            } else {
+                document.getElementById('pinError').textContent = 'Incorrect code. Try again.';
+                document.getElementById('pinInput').value = '';
+                document.getElementById('pinInput').focus();
+            }
+        }).catch(function() {
+            document.getElementById('pinError').textContent = 'Connection error. Try again.';
+        });
+    }
+    document.getElementById('pinInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') checkPin();
+    });
+    </script>
     <script src="/static/app.js"></script>
 </body>
 </html>

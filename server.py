@@ -49,6 +49,10 @@ CLOUD_BASE_URL = os.environ.get("CLOUD_BASE_URL", "https://huddle-meet.onrender.
 # Detect if we're the cloud instance (Render sets RENDER=true) or a local desktop
 IS_CLOUD = bool(os.environ.get("RENDER") or os.environ.get("IS_CLOUD"))
 
+# ── PIN Auth Config ────────────────────────────────────────────────────────
+APP_PIN = os.environ.get("APP_PIN", "AP19")
+PIN_SECRET = os.environ.get("PIN_SECRET", "huddle-pin-secret-key-2026")
+
 # In-memory session store: { session_id: { "user": {...}, "created": timestamp } }
 auth_sessions: dict[str, dict] = {}
 # Cache for Google public keys (used to verify Firebase ID tokens)
@@ -424,6 +428,37 @@ async def index(request):
 
 async def room_page(request):
     return web.FileResponse(STATIC_DIR / "index.html")
+
+
+# ── PIN Auth endpoints ──────────────────────────────────────────────────────
+
+def _make_pin_token():
+    payload = f"huddle-ok-{int(time.time()) // (86400 * 365)}"
+    sig = hmac.new(PIN_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()[:32]
+    return f"{payload}.{sig}"
+
+def _verify_pin_token(token):
+    try:
+        parts = token.rsplit(".", 1)
+        if len(parts) != 2:
+            return False
+        payload, sig = parts
+        expected = hmac.new(PIN_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()[:32]
+        return hmac.compare_digest(sig, expected)
+    except Exception:
+        return False
+
+async def pin_verify(request):
+    body = await request.json()
+    pin = body.get("pin", "")
+    if pin == APP_PIN:
+        return web.json_response({"ok": True, "token": _make_pin_token()})
+    return web.json_response({"ok": False, "error": "Incorrect code"}, status=401)
+
+async def pin_check(request):
+    body = await request.json()
+    token = body.get("token", "")
+    return web.json_response({"ok": _verify_pin_token(token)})
 
 
 async def create_room(request):
@@ -1405,6 +1440,8 @@ app.on_startup.append(on_startup)
 app.on_shutdown.append(on_shutdown)
 app.router.add_get("/", index)
 app.router.add_get("/api/version", version_check)
+app.router.add_post("/api/pin/verify", pin_verify)
+app.router.add_post("/api/pin/check", pin_check)
 app.router.add_get("/room/{room_id}", room_page)
 app.router.add_post("/api/auth/firebase", auth_firebase)
 app.router.add_get("/api/auth/me", auth_me)
