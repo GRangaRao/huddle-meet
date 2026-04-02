@@ -21,28 +21,6 @@
     "recurrence": "weekly",
     "endDate": ""
   },
-  "e6c3e4fa": {
-    "id": "e6c3e4fa",
-    "room_id": "cb79e27d",
-    "topic": "Demo1",
-    "date": "2026-04-02",
-    "time": "10:45",
-    "duration": 30,
-    "timezone": "Etc/GMT-1",
-    "recurring": false,
-    "recurrence": "weekly",
-    "endDate": "",
-    "passcodeEnabled": true,
-    "passcode": "n57vzf",
-    "waitingRoom": false,
-    "hostVideo": "on",
-    "participantVideo": "on",
-    "muteOnEntry": true,
-    "autoRecord": false,
-    "description": "1.  Video App Call demo for client\n2. Demo of Features",
-    "createdAt": "2026-04-02T09:45:44.424835",
-    "createdBy": "Ranga Galla"
-  },
   "79500135": {
     "id": "79500135",
     "room_id": "685dd515",
