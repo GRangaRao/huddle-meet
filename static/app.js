@@ -650,6 +650,11 @@ function enterCallScreen() {
     localMicIndicator.textContent = micEnabled ? "🎤" : "🔇";
     localMicIndicator.classList.toggle("muted", !micEnabled);
 
+    // Ensure remote audio can play (browser autoplay policy)
+    resumeAllRemoteAudio();
+    document.addEventListener("click", resumeAllRemoteAudio, { once: true });
+    document.addEventListener("touchstart", resumeAllRemoteAudio, { once: true });
+
     history.replaceState(null, "", `/room/${roomId}`);
     document.title = `Huddle - ${roomId}`;
     roomInfo.textContent = `Room: ${roomId}`;
@@ -1355,6 +1360,14 @@ function sendChat() {
 
 // ── WebRTC via mediasoup SFU ─────────────────────────────────────────────
 
+function resumeAllRemoteAudio() {
+    Object.values(peerConnections).forEach(conn => {
+        if (conn.videoEl && conn.videoEl.paused) {
+            conn.videoEl.play().catch(() => {});
+        }
+    });
+}
+
 function getOrCreatePeerTile(peerId, peerName) {
     if (peerConnections[peerId]) {
         if (peerName && peerName !== "Peer") {
@@ -1389,6 +1402,18 @@ function getOrCreatePeerTile(peerId, peerName) {
     const conn = { videoEl, tile, name: peerName, offOverlay, stream: new MediaStream(), muted: false };
     videoEl.srcObject = conn.stream;
     peerConnections[peerId] = conn;
+
+    // Try to play; if blocked by autoplay policy, retry on next user gesture
+    videoEl.play().catch(() => {
+        console.warn("[audio] Autoplay blocked for peer", peerId, "— will resume on user gesture");
+        const resume = () => {
+            videoEl.play().catch(() => {});
+            document.removeEventListener("click", resume);
+            document.removeEventListener("touchstart", resume);
+        };
+        document.addEventListener("click", resume, { once: true });
+        document.addEventListener("touchstart", resume, { once: true });
+    });
 
     updateGridLayout();
     updatePeerCount();
