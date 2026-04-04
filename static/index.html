@@ -63,99 +63,109 @@
 
     <!-- Landing / Join Screen -->
     <div id="joinScreen" class="screen active">
-        <div class="join-container">
-            <div class="logo-section">
+        <!-- Top nav bar -->
+        <nav class="landing-nav">
+            <div class="nav-brand">
                 <div class="logo"><span class="material-icons-round">videocam</span></div>
-                <h1>Huddle</h1>
-                <p class="subtitle">Simple, secure video calls in your browser</p>
-
-                <!-- Auth section -->
-                <div id="authSection" class="auth-section">
-                    <button id="googleSignInBtn" class="btn-google" style="display:none">
-                        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-                        Sign in with Google
-                    </button>
-                    <div id="userInfo" class="user-info" style="display:none">
-                        <img id="userAvatar" class="user-avatar" src="" alt="">
-                        <span id="userName" class="user-name"></span>
-                        <button id="signOutBtn" class="btn-signout" title="Sign out">
-                            <span class="material-icons-round" style="font-size:16px">logout</span>
-                        </button>
-                    </div>
-                    <button id="authGuestBtn" class="btn-guest" style="display:none">or continue as Guest</button>
-                </div>
+                <span class="nav-title">Huddle</span>
             </div>
+            <div id="authSection" class="auth-section">
+                <button id="googleSignInBtn" class="btn-google" style="display:none">
+                    <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+                    Sign in with Google
+                </button>
+                <div id="userInfo" class="user-info" style="display:none">
+                    <img id="userAvatar" class="user-avatar" src="" alt="">
+                    <span id="userName" class="user-name"></span>
+                    <button id="signOutBtn" class="btn-signout" title="Sign out">
+                        <span class="material-icons-round" style="font-size:16px">logout</span>
+                    </button>
+                </div>
+                <button id="authGuestBtn" class="btn-guest" style="display:none">Continue as Guest</button>
+            </div>
+        </nav>
 
-            <div class="join-layout">
-                <!-- Left column: preview + actions -->
-                <div class="join-left">
-                    <div class="join-card">
-                        <div class="preview-section">
-                            <div class="preview-header">
-                                <span class="preview-label">Camera preview</span>
-                                <div class="action-buttons">
-                                    <button id="newMeetingBtn" class="btn btn-primary btn-sm">
-                                        <span class="material-icons-round">video_call</span> Meet
-                                    </button>
-                                    <button id="scheduleMeetingBtn" class="btn btn-outline btn-sm">
-                                        <span class="material-icons-round">calendar_month</span> Schedule
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="preview-container">
-                                <video id="previewVideo" autoplay muted playsinline></video>
-                                <div class="preview-placeholder" id="previewPlaceholder">
-                                    <span class="material-icons-round">videocam_off</span>
-                                    <p>Camera off</p>
-                                </div>
-                                <div class="preview-controls">
-                                    <button id="previewMic" class="ctrl-btn active" title="Toggle microphone">
-                                        <span class="icon-on"><span class="material-icons-round">mic</span></span>
-                                        <span class="icon-off"><span class="material-icons-round">mic_off</span></span>
-                                    </button>
-                                    <button id="previewCam" class="ctrl-btn active" title="Toggle camera">
-                                        <span class="icon-on"><span class="material-icons-round">videocam</span></span>
-                                        <span class="icon-off"><span class="material-icons-round">videocam_off</span></span>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="prejoin-group">
-                            <input type="text" id="nameInput" placeholder="Your name" maxlength="50" autocomplete="name">
-                            <span class="name-hint">This name will be visible to others in the call</span>
-                        </div>
-
-                        <div class="join-actions">
-                            <div class="divider"><span>or</span></div>
-                            <div class="join-code-section">
-                                <span class="join-code-label">Have a code?</span>
-                                <div class="join-row">
-                                    <input type="text" id="roomInput" placeholder="Enter room code" maxlength="20">
-                                    <button id="joinBtn" class="btn btn-secondary">
-                                        <span class="material-icons-round">login</span> Join
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+        <!-- Hero section -->
+        <div class="landing-hero">
+            <div class="hero-left">
+                <div class="hero-content">
+                    <div class="hero-badge">Enterprise-Ready Video Conferencing</div>
+                    <h1 class="hero-title">Connect your team,<br>from anywhere</h1>
+                    <p class="hero-subtitle">Secure, reliable video meetings with real-time collaboration tools — whiteboard, polls, breakout rooms, shared notes, and more.</p>
+                    <div class="hero-trust">
+                        <span class="trust-badge"><span class="material-icons-round">verified_user</span> GDPR Compliant</span>
+                        <span class="trust-badge"><span class="material-icons-round">security</span> ISO 27001</span>
+                        <span class="trust-badge"><span class="material-icons-round">lock</span> End-to-End Encrypted</span>
                     </div>
                 </div>
 
-                <!-- Right column: upcoming meetings -->
-                <div class="join-right">
+                <!-- Upcoming meetings strip -->
+                <div class="landing-meetings">
                     <div id="scheduledMeetingsList" class="scheduled-meetings-panel">
                         <h3><span class="material-icons-round">event_note</span> Upcoming Meetings</h3>
                         <div id="scheduledMeetingsContent">
                             <div class="meetings-empty">
                                 <span class="material-icons-round">event_available</span>
-                                <p>No upcoming meetings</p>
-                                <span>Schedule one to get started</span>
+                                <p>No upcoming meetings — schedule one to get started</p>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <div class="hero-panel">
+                <div class="join-card">
+                    <!-- Camera preview -->
+                    <div class="preview-section">
+                        <div class="preview-container">
+                            <video id="previewVideo" autoplay muted playsinline></video>
+                            <div class="preview-placeholder" id="previewPlaceholder">
+                                <span class="material-icons-round">videocam_off</span>
+                                <p>Camera off</p>
+                            </div>
+                            <div class="preview-controls">
+                                <button id="previewMic" class="ctrl-btn active" title="Toggle microphone">
+                                    <span class="icon-on"><span class="material-icons-round">mic</span></span>
+                                    <span class="icon-off"><span class="material-icons-round">mic_off</span></span>
+                                </button>
+                                <button id="previewCam" class="ctrl-btn active" title="Toggle camera">
+                                    <span class="icon-on"><span class="material-icons-round">videocam</span></span>
+                                    <span class="icon-off"><span class="material-icons-round">videocam_off</span></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="prejoin-group">
+                        <input type="text" id="nameInput" placeholder="Your name" maxlength="50" autocomplete="name">
+                    </div>
+
+                    <div class="join-card-actions">
+                        <button id="newMeetingBtn" class="btn btn-primary">
+                            <span class="material-icons-round">video_call</span> New Meeting
+                        </button>
+                        <div class="join-row">
+                            <input type="text" id="roomInput" placeholder="Enter meeting code" maxlength="20">
+                            <button id="joinBtn" class="btn btn-secondary">
+                                <span class="material-icons-round">login</span> Join
+                            </button>
+                        </div>
+                        <button id="scheduleMeetingBtn" class="btn-schedule">
+                            <span class="material-icons-round">calendar_month</span> Schedule for later
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
+
+        <!-- Footer -->
+        <footer class="landing-footer">
+            <a href="/static/privacy.html" target="_blank">Privacy Policy</a>
+            <span class="footer-sep">·</span>
+            <span>GDPR &amp; ISO 27001 Compliant</span>
+            <span class="footer-sep">·</span>
+            <span>&copy; 2026 Huddle</span>
+        </footer>
     </div>
 
     <!-- Schedule Meeting Modal -->
@@ -305,6 +315,20 @@
         <div id="reactionsOverlay" class="reactions-overlay"></div>
 
         <div class="call-layout">
+            <!-- Left Tool Sidebar -->
+            <div class="tool-sidebar" id="toolSidebar">
+                <button id="whiteboardBtn" class="tool-sidebar-btn" title="Whiteboard"><span class="material-icons-round">draw</span><span>Whiteboard</span></button>
+                <button id="pollsBtn" class="tool-sidebar-btn" title="Polls"><span class="material-icons-round">poll</span><span>Polls</span></button>
+                <button id="breakoutBtn" class="tool-sidebar-btn" title="Breakout Rooms"><span class="material-icons-round">dashboard</span><span>Breakout</span></button>
+                <button id="notesBtn" class="tool-sidebar-btn" title="Notes"><span class="material-icons-round">description</span><span>Notes</span></button>
+                <button id="filesBtn" class="tool-sidebar-btn" title="Files"><span class="material-icons-round">folder_shared</span><span>Files</span></button>
+                <div class="tool-sidebar-divider"></div>
+                <button id="bgBlurBtn" class="tool-sidebar-btn" title="Background Blur"><span class="material-icons-round">blur_on</span><span>Blur</span></button>
+                <button id="virtualBgBtn" class="tool-sidebar-btn" title="Virtual Background"><span class="material-icons-round">wallpaper</span><span>Background</span></button>
+                <button id="deviceSelectBtn" class="tool-sidebar-btn" title="Settings"><span class="material-icons-round">settings</span><span>Settings</span></button>
+                <button id="shortcutsBtn" class="tool-sidebar-btn" title="Shortcuts"><span class="material-icons-round">keyboard</span><span>Shortcuts</span></button>
+            </div>
+
             <!-- Video Grid -->
             <div class="video-grid" id="videoGrid">
                 <!-- Local video -->
@@ -412,31 +436,82 @@
             <!-- Meeting Notes Panel -->
             <div class="side-panel" id="notesPanel">
                 <div class="panel-header-bar">
-                    <h3>Meeting Notes</h3>
+                    <h3>Notes</h3>
                     <button id="closeNotesBtn" class="icon-btn">✕</button>
                 </div>
-                <textarea id="notesTextarea" placeholder="Type your meeting notes here..."></textarea>
-                <div class="notes-sections">
-                    <details id="notesPollsSummary">
-                        <summary>Polls Summary</summary>
-                        <div id="notesPollsContent" class="notes-auto-content">No polls yet.</div>
-                    </details>
-                    <details id="notesWhiteboardSummary">
-                        <summary>Whiteboard Snapshot</summary>
-                        <div id="notesWhiteboardContent" class="notes-auto-content"><em>Open whiteboard to capture.</em></div>
-                    </details>
-                    <details id="notesBreakoutSummary">
-                        <summary>Breakout Rooms</summary>
-                        <div id="notesBreakoutContent" class="notes-auto-content">No breakout rooms yet.</div>
-                    </details>
-                    <details id="notesTranscriptSummary">
-                        <summary>Discussion Transcript</summary>
-                        <div id="notesTranscriptContent" class="notes-auto-content"><em>Enable captions (CC) to auto-capture discussion.</em></div>
-                    </details>
+
+                <!-- Tabs: Agenda / Meeting Notes / Follow-up Tasks -->
+                <div class="notes-tabs">
+                    <button class="notes-tab active" data-tab="agenda">
+                        <span class="material-icons-round">list_alt</span> Agenda
+                    </button>
+                    <button class="notes-tab" data-tab="meeting-notes">
+                        <span class="material-icons-round">edit_note</span> Notes
+                    </button>
+                    <button class="notes-tab" data-tab="tasks">
+                        <span class="material-icons-round">task_alt</span> Tasks
+                    </button>
                 </div>
-                <div style="display:flex;gap:8px;margin-top:8px">
-                    <button id="generateSummaryBtn" class="btn btn-small" style="flex:1"><span class="material-icons-round" style="font-size:16px;vertical-align:middle">auto_awesome</span> Generate Summary</button>
-                    <button id="saveNotesBtn" class="btn btn-small" style="flex:1"><span class="material-icons-round" style="font-size:16px;vertical-align:middle">save</span> Save Notes</button>
+
+                <!-- Agenda Tab -->
+                <div class="notes-tab-content active" id="notesTabAgenda" data-tab="agenda">
+                    <div id="agendaEmpty" class="notes-empty-state">
+                        <span class="material-icons-round" style="font-size:36px;color:var(--blue-600)">list_alt</span>
+                        <strong>Meeting Agenda</strong>
+                        <p>Type a topic below and press <kbd>Enter</kbd> or click <span class="material-icons-round" style="font-size:14px;vertical-align:middle;color:var(--blue-600)">add</span> to add it.</p>
+                        <p>Click <span class="material-icons-round" style="font-size:14px;vertical-align:middle;color:var(--green-500)">check</span> to mark items as discussed.</p>
+                    </div>
+                    <div id="agendaItems" class="agenda-list"></div>
+                    <div class="agenda-add-row">
+                        <input type="text" id="agendaInput" placeholder="e.g. Review Q2 roadmap" maxlength="200">
+                        <button id="addAgendaBtn" class="add-btn" title="Add agenda item"><span class="material-icons-round">add</span></button>
+                    </div>
+                </div>
+
+                <!-- Meeting Notes Tab -->
+                <div class="notes-tab-content" id="notesTabNotes" data-tab="meeting-notes">
+                    <textarea id="notesTextarea" placeholder="Type your meeting notes here..."></textarea>
+                    <div class="notes-sections">
+                        <details id="notesPollsSummary">
+                            <summary>Polls Summary</summary>
+                            <div id="notesPollsContent" class="notes-auto-content">No polls yet.</div>
+                        </details>
+                        <details id="notesWhiteboardSummary">
+                            <summary>Whiteboard Snapshot</summary>
+                            <div id="notesWhiteboardContent" class="notes-auto-content"><em>Open whiteboard to capture.</em></div>
+                        </details>
+                        <details id="notesBreakoutSummary">
+                            <summary>Breakout Rooms</summary>
+                            <div id="notesBreakoutContent" class="notes-auto-content">No breakout rooms yet.</div>
+                        </details>
+                        <details id="notesTranscriptSummary">
+                            <summary>Discussion Transcript</summary>
+                            <div id="notesTranscriptContent" class="notes-auto-content"><em>Enable captions (CC) to auto-capture discussion.</em></div>
+                        </details>
+                    </div>
+                </div>
+
+                <!-- Follow-up Tasks Tab -->
+                <div class="notes-tab-content" id="notesTabTasks" data-tab="tasks">
+                    <div id="tasksEmpty" class="notes-empty-state">
+                        <span class="material-icons-round" style="font-size:36px;color:var(--blue-600)">task_alt</span>
+                        <strong>Follow-up Tasks</strong>
+                        <p>Type an action item, pick who it's for, then press <kbd>Enter</kbd> or click <span class="material-icons-round" style="font-size:14px;vertical-align:middle;color:var(--blue-600)">add</span>.</p>
+                        <p>Tick the checkbox when done. All tasks are included in <em>Save All</em>.</p>
+                    </div>
+                    <div id="taskItems" class="task-list"></div>
+                    <div class="task-add-row">
+                        <input type="text" id="taskInput" placeholder="e.g. Send updated proposal" maxlength="200">
+                        <select id="taskAssignee" title="Assign to a participant">
+                            <option value="">Assign to...</option>
+                        </select>
+                        <button id="addTaskBtn" class="add-btn" title="Add task"><span class="material-icons-round">add</span></button>
+                    </div>
+                </div>
+
+                <div style="display:flex;gap:8px;margin:8px 16px 12px;flex-shrink:0">
+                    <button id="generateSummaryBtn" class="btn btn-small" style="flex:1"><span class="material-icons-round" style="font-size:16px;vertical-align:middle">auto_awesome</span> Summary</button>
+                    <button id="saveNotesBtn" class="btn btn-small" style="flex:1"><span class="material-icons-round" style="font-size:16px;vertical-align:middle">save</span> Save All</button>
                 </div>
             </div>
 
@@ -514,26 +589,6 @@
                 <button id="captionBtn" class="ctrl-btn" title="Toggle captions">
                     <span class="material-icons-round">closed_caption_off</span>
                 </button>
-
-                <!-- More menu -->
-                <div class="ctrl-dropdown">
-                    <button id="moreBtn" class="ctrl-btn" title="More">
-                        <span class="material-icons-round">more_vert</span>
-                    </button>
-                    <div class="dropdown-menu dropdown-up" id="moreMenu">
-                        <div class="more-grid">
-                            <button id="whiteboardBtn" class="more-grid-item" title="Whiteboard"><span class="material-icons-round">draw</span><span>Whiteboard</span></button>
-                            <button id="pollsBtn" class="more-grid-item" title="Polls"><span class="material-icons-round">poll</span><span>Polls</span></button>
-                            <button id="breakoutBtn" class="more-grid-item" title="Breakout Rooms"><span class="material-icons-round">dashboard</span><span>Breakout</span></button>
-                            <button id="notesBtn" class="more-grid-item" title="Notes"><span class="material-icons-round">description</span><span>Notes</span></button>
-                            <button id="filesBtn" class="more-grid-item" title="Share Files"><span class="material-icons-round">folder_shared</span><span>Files</span></button>
-                            <button id="bgBlurBtn" class="more-grid-item" title="Background Blur"><span class="material-icons-round">blur_on</span><span>Blur</span></button>
-                            <button id="virtualBgBtn" class="more-grid-item" title="Virtual Background"><span class="material-icons-round">wallpaper</span><span>Background</span></button>
-                            <button id="deviceSelectBtn" class="more-grid-item" title="Audio/Video Settings"><span class="material-icons-round">settings</span><span>Settings</span></button>
-                            <button id="shortcutsBtn" class="more-grid-item" title="Keyboard Shortcuts"><span class="material-icons-round">keyboard</span><span>Shortcuts</span></button>
-                        </div>
-                    </div>
-                </div>
 
                 <button id="leaveBtn" class="ctrl-btn leave" title="Leave call">
                     <span class="material-icons-round">call_end</span>

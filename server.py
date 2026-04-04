@@ -587,11 +587,15 @@ async def version_check(request):
 
 
 async def index(request):
-    return web.FileResponse(STATIC_DIR / "index.html")
+    resp = web.FileResponse(STATIC_DIR / "index.html")
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
 
 
 async def room_page(request):
-    return web.FileResponse(STATIC_DIR / "index.html")
+    resp = web.FileResponse(STATIC_DIR / "index.html")
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
 
 
 # ── PIN Auth endpoints ──────────────────────────────────────────────────────
@@ -1468,6 +1472,10 @@ async def websocket_handler(request):
                         room_breakouts[room_id] = {"rooms": {}, "active": False}
                         await broadcast(room_id, {"action": "breakout-ended"})
 
+                # ── Notes: Agenda & Tasks sync ────────────────
+                elif action in ("agenda-update", "tasks-update"):
+                    await broadcast(room_id, data, exclude=peer_id)
+
             elif msg.type == web.WSMsgType.ERROR:
                 print(f"WebSocket error: {ws.exception()}")
 
@@ -1651,7 +1659,15 @@ async def on_shutdown(app_instance):
         print("[db] PostgreSQL pool closed")
 
 
-app = web.Application()
+@web.middleware
+async def no_cache_middleware(request, handler):
+    resp = await handler(request)
+    if request.path.endswith(('.html', '.js', '.css')):
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        resp.headers['Pragma'] = 'no-cache'
+    return resp
+
+app = web.Application(middlewares=[no_cache_middleware])
 app.on_startup.append(on_startup)
 app.on_shutdown.append(on_shutdown)
 app.router.add_get("/", index)

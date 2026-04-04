@@ -633,6 +633,19 @@ async function handleSignal(msg) {
         case "file-deleted":
             onFileDeleted(msg.file_id);
             break;
+
+        // ── Notes: Agenda & Tasks sync ──────────────────────
+        case "agenda-update":
+            agendaItems.length = 0;
+            if (Array.isArray(msg.agenda)) msg.agenda.forEach(a => agendaItems.push(a));
+            renderAgenda();
+            break;
+
+        case "tasks-update":
+            taskItems.length = 0;
+            if (Array.isArray(msg.tasks)) msg.tasks.forEach(t => taskItems.push(t));
+            renderTasks();
+            break;
     }
 }
 
@@ -857,19 +870,41 @@ function setupCallControls() {
     // Background blur
     document.getElementById("bgBlurBtn").addEventListener("click", toggleBgBlur);
 
-    // Meeting Notes
+    // Meeting Notes (Teams-style tabs: Agenda / Notes / Tasks)
     document.getElementById("notesBtn").addEventListener("click", () => {
         const panel = document.getElementById("notesPanel");
         const open = !panel.classList.contains("open");
         closeSidePanels("notesPanel");
         panel.classList.toggle("open", open);
-        if (open) refreshNotesSummaries();
+        if (open) {
+            refreshNotesSummaries();
+            refreshTaskAssignees();
+        }
     });
     document.getElementById("closeNotesBtn").addEventListener("click", () => {
         document.getElementById("notesPanel").classList.remove("open");
     });
     document.getElementById("saveNotesBtn").addEventListener("click", saveNotes);
     document.getElementById("generateSummaryBtn").addEventListener("click", generateAndInsertSummary);
+
+    // Notes tab switching
+    document.querySelectorAll(".notes-tab").forEach(tab => {
+        tab.addEventListener("click", () => {
+            document.querySelectorAll(".notes-tab").forEach(t => t.classList.remove("active"));
+            document.querySelectorAll(".notes-tab-content").forEach(c => c.classList.remove("active"));
+            tab.classList.add("active");
+            const target = tab.getAttribute("data-tab");
+            document.querySelector(`.notes-tab-content[data-tab="${target}"]`).classList.add("active");
+        });
+    });
+
+    // Agenda
+    document.getElementById("addAgendaBtn").addEventListener("click", addAgendaItem);
+    document.getElementById("agendaInput").addEventListener("keydown", e => { if (e.key === "Enter") addAgendaItem(); });
+
+    // Tasks
+    document.getElementById("addTaskBtn").addEventListener("click", addTaskItem);
+    document.getElementById("taskInput").addEventListener("keydown", e => { if (e.key === "Enter") addTaskItem(); });
 
     // Files panel
     document.getElementById("filesBtn").addEventListener("click", () => {
@@ -901,16 +936,6 @@ function setupCallControls() {
 
     // Captions toggle
     document.getElementById("captionBtn").addEventListener("click", toggleCaptions);
-
-    // More menu click toggle (for mobile/touch)
-    document.getElementById("moreBtn").addEventListener("click", (e) => {
-        e.stopPropagation();
-        const menu = document.getElementById("moreMenu");
-        menu.classList.toggle("open");
-    });
-    document.addEventListener("click", () => {
-        document.getElementById("moreMenu").classList.remove("open");
-    });
 
     // Device selector
     document.getElementById("deviceSelectBtn").addEventListener("click", openDeviceSelector);
@@ -1285,9 +1310,14 @@ function startRecording() {
         ...dest.stream.getAudioTracks(),
     ]);
 
-    const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
-        ? "video/webm;codecs=vp9,opus"
-        : "video/webm";
+    const mimeType = MediaRecorder.isTypeSupported("video/mp4;codecs=avc1,mp4a.40.2")
+        ? "video/mp4;codecs=avc1,mp4a.40.2"
+        : MediaRecorder.isTypeSupported("video/mp4")
+            ? "video/mp4"
+            : MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+                ? "video/webm;codecs=vp9,opus"
+                : "video/webm";
+    const fileExt = mimeType.startsWith("video/mp4") ? "mp4" : "webm";
 
     recordedChunks = [];
     mediaRecorder = new MediaRecorder(combined, { mimeType });
@@ -1305,10 +1335,10 @@ function startRecording() {
         const a = document.createElement("a");
         const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
         a.href = url;
-        a.download = `Huddle-${roomId}-${timestamp}.webm`;
+        a.download = `Huddle-${roomId}-${timestamp}.${fileExt}`;
         a.click();
         URL.revokeObjectURL(url);
-        showToast("Recording saved!");
+        showToast(`Recording saved as ${fileExt.toUpperCase()}!`);
     };
 
     mediaRecorder._drawInterval = drawInterval;
@@ -1748,6 +1778,12 @@ function closeSidePanels(except) {
         if (id !== except) document.getElementById(id).classList.remove("open");
     });
     if (except !== "chatPanel") { chatOpen = false; chatBtn.classList.remove("active"); }
+    // Update tool sidebar active states
+    const panelToBtnMap = { whiteboardPanel: "whiteboardBtn", pollsPanel: "pollsBtn", breakoutPanel: "breakoutBtn", notesPanel: "notesBtn", filesPanel: "filesBtn" };
+    for (const [panelId, btnId] of Object.entries(panelToBtnMap)) {
+        const btn = document.getElementById(btnId);
+        if (btn) btn.classList.toggle("active", panelId === except && document.getElementById(panelId).classList.contains("open"));
+    }
 }
 
 // ── Meeting Timer ───────────────────────────────────────────────────────
@@ -2258,6 +2294,184 @@ function formatTranscriptSummary() {
     return html;
 }
 
+// ── Agenda Items ─────────────────────────────────────────────────────────
+const agendaItems = [];
+
+function addAgendaItem() {
+    const input = document.getElementById("agendaInput");
+    const text = input.value.trim();
+    if (!text) { input.focus(); input.style.borderColor = 'var(--red-500)'; setTimeout(() => input.style.borderColor = '', 1000); return; }
+    agendaItems.push({ text, done: false });
+    input.value = "";
+    renderAgenda();
+    // Broadcast to peers
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action: "agenda-update", agenda: agendaItems }));
+    }
+}
+
+function renderAgenda() {
+    const container = document.getElementById("agendaItems");
+    const empty = document.getElementById("agendaEmpty");
+    container.innerHTML = "";
+    if (empty) empty.style.display = agendaItems.length ? "none" : "flex";
+    agendaItems.forEach((item, i) => {
+        const div = document.createElement("div");
+        div.className = "agenda-item" + (item.done ? " done" : "");
+        div.innerHTML = `
+            <span class="agenda-num">${item.done ? '✓' : i + 1}</span>
+            <span class="agenda-text">${escapeHtml(item.text)}</span>
+            <div class="agenda-actions">
+                <button class="agenda-edit-btn" title="Edit" data-idx="${i}"><span class="material-icons-round">edit</span></button>
+                <button class="agenda-toggle-btn" title="${item.done ? 'Reopen' : 'Mark done'}" data-idx="${i}"><span class="material-icons-round">${item.done ? 'undo' : 'check'}</span></button>
+                <button class="agenda-remove-btn" title="Remove" data-idx="${i}"><span class="material-icons-round">close</span></button>
+            </div>`;
+        container.appendChild(div);
+    });
+    container.querySelectorAll(".agenda-edit-btn").forEach(btn => {
+        btn.addEventListener("click", () => editAgenda(parseInt(btn.dataset.idx)));
+    });
+    container.querySelectorAll(".agenda-toggle-btn").forEach(btn => {
+        btn.addEventListener("click", () => toggleAgenda(parseInt(btn.dataset.idx)));
+    });
+    container.querySelectorAll(".agenda-remove-btn").forEach(btn => {
+        btn.addEventListener("click", () => removeAgenda(parseInt(btn.dataset.idx)));
+    });
+}
+
+function toggleAgenda(i) {
+    agendaItems[i].done = !agendaItems[i].done;
+    renderAgenda();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action: "agenda-update", agenda: agendaItems }));
+    }
+}
+
+function editAgenda(i) {
+    const item = agendaItems[i];
+    const input = document.getElementById("agendaInput");
+    const newText = prompt("Edit agenda item:", item.text);
+    if (newText !== null && newText.trim()) {
+        agendaItems[i].text = newText.trim();
+        renderAgenda();
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ action: "agenda-update", agenda: agendaItems }));
+        }
+    }
+}
+
+function removeAgenda(i) {
+    agendaItems.splice(i, 1);
+    renderAgenda();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action: "agenda-update", agenda: agendaItems }));
+    }
+}
+
+// ── Follow-up Tasks ──────────────────────────────────────────────────────
+const taskItems = [];
+
+function addTaskItem() {
+    const input = document.getElementById("taskInput");
+    const assigneeSelect = document.getElementById("taskAssignee");
+    const text = input.value.trim();
+    if (!text) { input.focus(); input.style.borderColor = 'var(--red-500)'; setTimeout(() => input.style.borderColor = '', 1000); return; }
+    taskItems.push({ text, done: false, assignee: assigneeSelect.value || "" });
+    input.value = "";
+    renderTasks();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action: "tasks-update", tasks: taskItems }));
+    }
+}
+
+function renderTasks() {
+    const container = document.getElementById("taskItems");
+    const empty = document.getElementById("tasksEmpty");
+    container.innerHTML = "";
+    if (empty) empty.style.display = taskItems.length ? "none" : "flex";
+    const pending = taskItems.filter(t => !t.done);
+    const completed = taskItems.filter(t => t.done);
+    [...pending, ...completed].forEach((item) => {
+        const idx = taskItems.indexOf(item);
+        const div = document.createElement("div");
+        div.className = "task-item" + (item.done ? " done" : "");
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = item.done;
+        cb.addEventListener("change", () => toggleTask(idx));
+        div.appendChild(cb);
+
+        const body = document.createElement("div");
+        body.className = "task-body";
+        body.innerHTML = `<div class="task-text">${escapeHtml(item.text)}</div>${item.assignee ? `<div class="task-assignee">↳ ${escapeHtml(item.assignee)}</div>` : ''}`;
+        div.appendChild(body);
+
+        const edit = document.createElement("button");
+        edit.className = "task-edit";
+        edit.title = "Edit";
+        edit.innerHTML = '<span class="material-icons-round">edit</span>';
+        edit.addEventListener("click", () => editTask(idx));
+        div.appendChild(edit);
+
+        const del = document.createElement("button");
+        del.className = "task-delete";
+        del.title = "Remove";
+        del.innerHTML = '<span class="material-icons-round">close</span>';
+        del.addEventListener("click", () => removeTask(idx));
+        div.appendChild(del);
+
+        container.appendChild(div);
+    });
+}
+
+function toggleTask(i) {
+    taskItems[i].done = !taskItems[i].done;
+    renderTasks();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action: "tasks-update", tasks: taskItems }));
+    }
+}
+
+function editTask(i) {
+    const item = taskItems[i];
+    const newText = prompt("Edit task:", item.text);
+    if (newText !== null && newText.trim()) {
+        taskItems[i].text = newText.trim();
+        renderTasks();
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ action: "tasks-update", tasks: taskItems }));
+        }
+    }
+}
+
+function removeTask(i) {
+    taskItems.splice(i, 1);
+    renderTasks();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action: "tasks-update", tasks: taskItems }));
+    }
+}
+
+function refreshTaskAssignees() {
+    const select = document.getElementById("taskAssignee");
+    const current = select.value;
+    select.innerHTML = '<option value="">Assign to...</option>';
+    // Add self
+    const selfOpt = document.createElement("option");
+    selfOpt.value = myName || "You";
+    selfOpt.textContent = myName || "You";
+    select.appendChild(selfOpt);
+    // Add peers
+    for (const pid in peerConnections) {
+        const name = peerConnections[pid]?.name || peers?.[pid]?.name || "Peer";
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        select.appendChild(opt);
+    }
+    if (current) select.value = current;
+}
+
 function generateAndInsertSummary() {
     const textarea = document.getElementById('notesTextarea');
     const speechEntries = meetingTranscript.filter(e => e.type === 'speech');
@@ -2361,8 +2575,26 @@ function saveNotes() {
     content += `Duration: ${meetingDuration}\n`;
     content += `Participants (${participantCount}): ${participants.join(", ")}\n\n`;
 
+    // Agenda
+    if (agendaItems.length) {
+        content += `--- Agenda ---\n`;
+        agendaItems.forEach((a, i) => {
+            content += `  ${a.done ? '✓' : '○'} ${i + 1}. ${a.text}\n`;
+        });
+        content += `\n`;
+    }
+
     if (userNotes.trim()) {
-        content += `--- Notes ---\n${userNotes}\n\n`;
+        content += `--- Meeting Notes ---\n${userNotes}\n\n`;
+    }
+
+    // Follow-up Tasks
+    if (taskItems.length) {
+        content += `--- Follow-up Tasks ---\n`;
+        taskItems.forEach(t => {
+            content += `  ${t.done ? '✓' : '☐'} ${t.text}${t.assignee ? ' → ' + t.assignee : ''}\n`;
+        });
+        content += `\n`;
     }
 
     if (pollsText) {
@@ -3418,6 +3650,27 @@ function stopSpeechRecognition() {
 
     if (!scheduleBtn) return;
 
+    // Open modal — require sign-in first
+    scheduleBtn.addEventListener("click", () => {
+        if (!isAuthenticated) {
+            showToast("Please sign in with Google to schedule meetings");
+            return;
+        }
+        scheduleModal.style.display = "flex";
+        const topicEl = document.getElementById("schTopic");
+        if (topicEl) topicEl.focus();
+    });
+
+    // Close modal
+    function closeModal() {
+        scheduleModal.style.display = "none";
+    }
+    if (closeScheduleModal) closeScheduleModal.addEventListener("click", closeModal);
+    if (schCancelBtn) schCancelBtn.addEventListener("click", closeModal);
+    scheduleModal.addEventListener("click", (e) => {
+        if (e.target === scheduleModal) closeModal();
+    });
+
     // Populate timezone dropdown with GMT offsets
     const gmtZones = [
         { value: "Etc/GMT+12",  label: "GMT-12:00" },
@@ -3455,13 +3708,13 @@ function stopSpeechRecognition() {
         schTimezone.appendChild(opt);
     });
     // Select closest GMT offset to user's local timezone
-    const bestMatch = gmtZones.reduce((best, tz) => {
-        const tzDate = new Date().toLocaleString("en-US", { timeZone: tz.value });
-        const tzOffset = -(new Date(tzDate).getTimezoneOffset ? 0 : 0);
-        return tz.label.includes(`GMT+${String(userOffsetHrs).padStart(2, "0")}`) ||
-               tz.label.includes(`GMT-${String(-userOffsetHrs).padStart(2, "0")}`) ? tz : best;
-    }, gmtZones[12]);
-    schTimezone.value = bestMatch.value;
+    try {
+        const bestMatch = gmtZones.reduce((best, tz) => {
+            return tz.label.includes(`GMT+${String(userOffsetHrs).padStart(2, "0")}`) ||
+                   tz.label.includes(`GMT-${String(-userOffsetHrs).padStart(2, "0")}`) ? tz : best;
+        }, gmtZones[12]);
+        schTimezone.value = bestMatch.value;
+    } catch (e) { console.warn("Timezone auto-select failed:", e); }
 
     // Populate time dropdown with 15-minute slots
     const schTimeSelect = document.getElementById("schTime");
@@ -3511,26 +3764,6 @@ function stopSpeechRecognition() {
         if (schPasscode.checked && !document.getElementById("schPasscodeInput").value) {
             document.getElementById("schPasscodeInput").value = generatePasscode();
         }
-    });
-
-    // Open modal
-    scheduleBtn.addEventListener("click", () => {
-        if (!isAuthenticated) {
-            showToast("Please sign in with Google to schedule a meeting");
-            return;
-        }
-        scheduleModal.style.display = "flex";
-        document.getElementById("schTopic").focus();
-    });
-
-    // Close modal
-    function closeModal() {
-        scheduleModal.style.display = "none";
-    }
-    closeScheduleModal.addEventListener("click", closeModal);
-    schCancelBtn.addEventListener("click", closeModal);
-    scheduleModal.addEventListener("click", (e) => {
-        if (e.target === scheduleModal) closeModal();
     });
 
     // Save meeting
