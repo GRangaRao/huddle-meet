@@ -1,0 +1,41 @@
+Huddle Meeting
+
+Topic: security
+Time: Saturday 28 March 2026 at 08:18
+Duration: 30 min
+
+Join: http://localhost:8080/room/df5acd7f
+Passcode: t50ri0
+
+set DATABASE_URL=postgresql://user:pass@localhost:5432/huddle
+python server.py
+
+Huddle Meeting
+
+Topic: security
+Time: Saturday, March 28, 2026 at 10:00 AM
+Duration: 15 min
+
+Join: http://localhost:8080/room/1ce6e040
+Passcode: q95e2f
+
+Huddle Meeting
+
+Topic: sec
+Time: Saturday 28 March 2026 at 12:30
+Duration: 30 min
+
+Join: https://huddle-meet-app.hf.space/room/afe4e7ed
+Passcode: 8pa9r6
+
+Huddle Meeting
+
+Huddle Meeting
+
+Topic: Untitled Meeting
+Time: Monday, March 30, 2026 at 02:15 PM
+Duration: 30 min
+Organised by: Ranga Galla
+
+Join: https://huddle-meet.onrender.com/room/670c07c6
+Passcode: oqfq0g

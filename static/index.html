@@ -14,6 +14,39 @@
 </head>
 <body>
 
+<!-- ── Cookie Consent Banner (GDPR) ──────────────────────────── -->
+<div id="cookieConsent" class="cookie-consent" style="display:none">
+    <div class="cookie-inner">
+        <div class="cookie-text">
+            <span class="material-icons-round cookie-icon">cookie</span>
+            <div>
+                <strong>We value your privacy</strong>
+                <p>Huddle uses essential cookies for authentication and session management. Optional analytics cookies help us improve the service. See our <a href="/static/privacy.html" target="_blank">Privacy Policy</a>.</p>
+            </div>
+        </div>
+        <div class="cookie-actions">
+            <button id="cookieRejectBtn" class="btn btn-outline btn-sm">Essential Only</button>
+            <button id="cookieAcceptBtn" class="btn btn-primary btn-sm">Accept All</button>
+        </div>
+    </div>
+</div>
+<script>
+(function() {
+    var consent = localStorage.getItem('huddle_cookie_consent');
+    if (!consent) {
+        document.getElementById('cookieConsent').style.display = 'flex';
+    }
+    document.getElementById('cookieAcceptBtn').addEventListener('click', function() {
+        localStorage.setItem('huddle_cookie_consent', JSON.stringify({essential:true, analytics:true, ts: new Date().toISOString()}));
+        document.getElementById('cookieConsent').style.display = 'none';
+    });
+    document.getElementById('cookieRejectBtn').addEventListener('click', function() {
+        localStorage.setItem('huddle_cookie_consent', JSON.stringify({essential:true, analytics:false, ts: new Date().toISOString()}));
+        document.getElementById('cookieConsent').style.display = 'none';
+    });
+})();
+</script>
+
 <!-- ── PIN Auth Overlay ───────────────────────────────────────── -->
 <div id="pinOverlay" class="pin-overlay">
     <div class="pin-card">
@@ -488,15 +521,17 @@
                         <span class="material-icons-round">more_vert</span>
                     </button>
                     <div class="dropdown-menu dropdown-up" id="moreMenu">
-                        <button id="whiteboardBtn" class="dropdown-item" title="Whiteboard"><span class="material-icons-round">draw</span><span>Whiteboard</span></button>
-                        <button id="pollsBtn" class="dropdown-item" title="Polls"><span class="material-icons-round">poll</span><span>Polls</span></button>
-                        <button id="breakoutBtn" class="dropdown-item" title="Breakout Rooms"><span class="material-icons-round">dashboard</span><span>Breakout Rooms</span></button>
-                        <button id="notesBtn" class="dropdown-item" title="Notes"><span class="material-icons-round">description</span><span>Notes</span></button>
-                        <button id="filesBtn" class="dropdown-item" title="Share Files"><span class="material-icons-round">folder_shared</span><span>Share Files</span></button>
-                        <button id="bgBlurBtn" class="dropdown-item" title="Background Blur"><span class="material-icons-round">blur_on</span><span>Background Blur</span></button>
-                        <button id="virtualBgBtn" class="dropdown-item" title="Virtual Background"><span class="material-icons-round">wallpaper</span><span>Virtual Background</span></button>
-                        <button id="deviceSelectBtn" class="dropdown-item" title="Audio/Video Settings"><span class="material-icons-round">settings</span><span>Settings</span></button>
-                        <button id="shortcutsBtn" class="dropdown-item" title="Keyboard Shortcuts"><span class="material-icons-round">keyboard</span><span>Shortcuts</span></button>
+                        <div class="more-grid">
+                            <button id="whiteboardBtn" class="more-grid-item" title="Whiteboard"><span class="material-icons-round">draw</span><span>Whiteboard</span></button>
+                            <button id="pollsBtn" class="more-grid-item" title="Polls"><span class="material-icons-round">poll</span><span>Polls</span></button>
+                            <button id="breakoutBtn" class="more-grid-item" title="Breakout Rooms"><span class="material-icons-round">dashboard</span><span>Breakout</span></button>
+                            <button id="notesBtn" class="more-grid-item" title="Notes"><span class="material-icons-round">description</span><span>Notes</span></button>
+                            <button id="filesBtn" class="more-grid-item" title="Share Files"><span class="material-icons-round">folder_shared</span><span>Files</span></button>
+                            <button id="bgBlurBtn" class="more-grid-item" title="Background Blur"><span class="material-icons-round">blur_on</span><span>Blur</span></button>
+                            <button id="virtualBgBtn" class="more-grid-item" title="Virtual Background"><span class="material-icons-round">wallpaper</span><span>Background</span></button>
+                            <button id="deviceSelectBtn" class="more-grid-item" title="Audio/Video Settings"><span class="material-icons-round">settings</span><span>Settings</span></button>
+                            <button id="shortcutsBtn" class="more-grid-item" title="Keyboard Shortcuts"><span class="material-icons-round">keyboard</span><span>Shortcuts</span></button>
+                        </div>
                     </div>
                 </div>
 

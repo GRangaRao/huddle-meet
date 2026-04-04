@@ -1,0 +1,15 @@
+Huddle Meeting
+
+Topic: Demo1
+Time: Thursday 2 April 2026 at 11:15
+Duration: 30 min
+Organised by: Ranga Galla
+
+Agenda:
+1.  Video App Call demo for client
+2. Demo of Features
+
+Join: https://huddle-meet.onrender.com/room/685dd515
+Passcode: n57vzf
+
+wget --user=rgnv --ask-password https://af01p-ir.devtools.intel.com/artifactory/qat-tools-ir-local/IR5.0_mini_release/03-17-2026-3710/ACTargetTools/ACTargetTools.L.1.0.0-1.tar.gz
