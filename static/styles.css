@@ -1160,10 +1160,33 @@ input[type="text"]::placeholder {
 .dropdown-menu.open { display: flex; }
 
 #moreMenu {
-    flex-direction: row;
-    padding: 8px;
-    gap: 4px;
-    min-width: auto;
+    flex-direction: column;
+    padding: 6px 0;
+    gap: 0;
+    min-width: 220px;
+    border-radius: 12px;
+}
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: inherit;
+    text-align: left;
+    transition: background var(--transition);
+}
+.dropdown-item:hover {
+    background: var(--surface-alt);
+}
+.dropdown-item .material-icons-round {
+    font-size: 20px;
+    opacity: 0.8;
 }
 .dropdown-icon-btn {
     display: flex;
