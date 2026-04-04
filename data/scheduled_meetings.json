@@ -20,5 +20,27 @@
     "description": "",
     "createdAt": "2026-04-04T02:19:51.636214",
     "createdBy": "Ranga Galla"
+  },
+  "798f53bf": {
+    "id": "798f53bf",
+    "room_id": "17964a18",
+    "topic": "Untitled Meeting",
+    "date": "2026-04-04",
+    "time": "03:30",
+    "duration": 30,
+    "timezone": "Etc/GMT-1",
+    "recurring": false,
+    "recurrence": "weekly",
+    "endDate": "",
+    "passcodeEnabled": true,
+    "passcode": "1uuyto",
+    "waitingRoom": false,
+    "hostVideo": "on",
+    "participantVideo": "on",
+    "muteOnEntry": true,
+    "autoRecord": false,
+    "description": "",
+    "createdAt": "2026-04-04T02:34:49.822354",
+    "createdBy": "Ranga Galla"
   }
 }
