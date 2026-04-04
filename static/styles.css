@@ -2393,7 +2393,10 @@ input[type="text"]::placeholder {
     animation: slideUp 0.3s ease-out;
 }
 /* Push page content above the cookie banner when visible */
-body.has-cookie-banner #joinScreen { padding-bottom: 80px; }
+body.has-cookie-banner #joinScreen { padding-bottom: 90px; }
+@media (max-width: 600px) {
+    body.has-cookie-banner #joinScreen { padding-bottom: 200px; }
+}
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .cookie-inner {
     max-width: 900px; width: 100%;
