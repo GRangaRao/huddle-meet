@@ -35,14 +35,17 @@
     var consent = localStorage.getItem('huddle_cookie_consent');
     if (!consent) {
         document.getElementById('cookieConsent').style.display = 'flex';
+        document.body.classList.add('has-cookie-banner');
     }
     document.getElementById('cookieAcceptBtn').addEventListener('click', function() {
         localStorage.setItem('huddle_cookie_consent', JSON.stringify({essential:true, analytics:true, ts: new Date().toISOString()}));
         document.getElementById('cookieConsent').style.display = 'none';
+        document.body.classList.remove('has-cookie-banner');
     });
     document.getElementById('cookieRejectBtn').addEventListener('click', function() {
         localStorage.setItem('huddle_cookie_consent', JSON.stringify({essential:true, analytics:false, ts: new Date().toISOString()}));
         document.getElementById('cookieConsent').style.display = 'none';
+        document.body.classList.remove('has-cookie-banner');
     });
 })();
 </script>

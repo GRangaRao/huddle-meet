@@ -2392,6 +2392,8 @@ input[type="text"]::placeholder {
     display: flex; align-items: center; justify-content: center;
     animation: slideUp 0.3s ease-out;
 }
+/* Push page content above the cookie banner when visible */
+body.has-cookie-banner #joinScreen { padding-bottom: 80px; }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .cookie-inner {
     max-width: 900px; width: 100%;
