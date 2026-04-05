@@ -21,28 +21,6 @@
     "createdAt": "2026-04-04T04:07:48.643210",
     "createdBy": "Ranga Galla"
   },
-  "fa1971aa": {
-    "id": "fa1971aa",
-    "room_id": "d43dca77",
-    "topic": "Security",
-    "date": "2026-04-04",
-    "time": "05:30",
-    "duration": 30,
-    "timezone": "Etc/GMT-1",
-    "recurring": false,
-    "recurrence": "weekly",
-    "endDate": "",
-    "passcodeEnabled": true,
-    "passcode": "gc6fwk",
-    "waitingRoom": true,
-    "hostVideo": "on",
-    "participantVideo": "on",
-    "muteOnEntry": true,
-    "autoRecord": true,
-    "description": "",
-    "createdAt": "2026-04-04T04:35:54.133107",
-    "createdBy": "Ranga Galla"
-  },
   "a02eb88a": {
     "id": "a02eb88a",
     "room_id": "63e470ff",
