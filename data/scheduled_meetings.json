@@ -20,5 +20,27 @@
     "description": "1.  Dashboard demo\n2. Market Potential\n3. Mitigation plan for PQC quantum safe",
     "createdAt": "2026-04-04T04:07:48.643210",
     "createdBy": "Ranga Galla"
+  },
+  "066559ff": {
+    "id": "066559ff",
+    "room_id": "43493ac6",
+    "topic": "Demo of the Tools",
+    "date": "2026-04-11",
+    "time": "20:00",
+    "duration": 30,
+    "timezone": "Etc/GMT-1",
+    "recurring": false,
+    "recurrence": "weekly",
+    "endDate": "",
+    "passcodeEnabled": true,
+    "passcode": "45rpt2",
+    "waitingRoom": false,
+    "hostVideo": "on",
+    "participantVideo": "on",
+    "muteOnEntry": true,
+    "autoRecord": false,
+    "description": "Agenda\n\n1. Demo of the video app\n2. Demo of the PQC\n3. Feedback",
+    "createdAt": "2026-04-11T13:35:46.426257",
+    "createdBy": "Ranga Galla"
   }
 }
