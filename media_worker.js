@@ -12,9 +12,25 @@ app.use(express.json());
 
 // ── Config ───────────────────────────────────────────────────────────────
 const MEDIA_PORT = parseInt(process.env.MEDIA_WORKER_PORT || "3000");
-const ANNOUNCED_IP = process.env.ANNOUNCED_IP || "0.0.0.0";
 const RTC_MIN_PORT = parseInt(process.env.RTC_MIN_PORT || "10000");
 const RTC_MAX_PORT = parseInt(process.env.RTC_MAX_PORT || "10100");
+
+// Auto-detect public IP for Render / cloud deployments
+async function getAnnouncedIp() {
+  const envIp = process.env.ANNOUNCED_IP;
+  if (envIp && envIp !== "0.0.0.0") return envIp;
+  try {
+    const res = await fetch("https://api.ipify.org?format=json");
+    const data = await res.json();
+    console.log(`[ms] Auto-detected public IP: ${data.ip}`);
+    return data.ip;
+  } catch (e) {
+    console.warn("[ms] Could not detect public IP, using 0.0.0.0");
+    return "0.0.0.0";
+  }
+}
+
+let ANNOUNCED_IP = process.env.ANNOUNCED_IP || "0.0.0.0";
 
 const mediaCodecs = [
   {
@@ -66,6 +82,10 @@ const rooms = {};
 
 // ── Worker Setup ─────────────────────────────────────────────────────────
 async function createWorker() {
+  // Resolve public IP before creating transports
+  ANNOUNCED_IP = await getAnnouncedIp();
+  webRtcTransportOptions.listenIps = [{ ip: "0.0.0.0", announcedIp: ANNOUNCED_IP }];
+
   worker = await mediasoup.createWorker({
     rtcMinPort: RTC_MIN_PORT,
     rtcMaxPort: RTC_MAX_PORT,

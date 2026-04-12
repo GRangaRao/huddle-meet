@@ -1487,6 +1487,14 @@ function onSendTransportCreated(data) {
         iceParameters: data.iceParameters,
         iceCandidates: data.iceCandidates,
         dtlsParameters: data.dtlsParameters,
+        iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            { urls: "stun:stun1.l.google.com:19302" },
+            { urls: "turn:a.relay.metered.ca:80", username: "e8dd65b92ae694560ab7b5c1", credential: "5VsSQWj2THpIx9Il" },
+            { urls: "turn:a.relay.metered.ca:443", username: "e8dd65b92ae694560ab7b5c1", credential: "5VsSQWj2THpIx9Il" },
+            { urls: "turn:a.relay.metered.ca:443?transport=tcp", username: "e8dd65b92ae694560ab7b5c1", credential: "5VsSQWj2THpIx9Il" },
+        ],
+        iceTransportPolicy: "all",
     });
 
     sendTransport.on("connect", ({ dtlsParameters }, callback, errback) => {
@@ -1529,6 +1537,14 @@ function onRecvTransportCreated(data) {
         iceParameters: data.iceParameters,
         iceCandidates: data.iceCandidates,
         dtlsParameters: data.dtlsParameters,
+        iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            { urls: "stun:stun1.l.google.com:19302" },
+            { urls: "turn:a.relay.metered.ca:80", username: "e8dd65b92ae694560ab7b5c1", credential: "5VsSQWj2THpIx9Il" },
+            { urls: "turn:a.relay.metered.ca:443", username: "e8dd65b92ae694560ab7b5c1", credential: "5VsSQWj2THpIx9Il" },
+            { urls: "turn:a.relay.metered.ca:443?transport=tcp", username: "e8dd65b92ae694560ab7b5c1", credential: "5VsSQWj2THpIx9Il" },
+        ],
+        iceTransportPolicy: "all",
     });
 
     recvTransport.on("connect", ({ dtlsParameters }, callback, errback) => {
