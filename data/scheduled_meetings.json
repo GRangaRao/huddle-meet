@@ -1,26 +1,4 @@
 {
-  "4922352b": {
-    "id": "4922352b",
-    "room_id": "15ffd9e6",
-    "topic": "PQC Sentinel Demo",
-    "date": "2026-04-05",
-    "time": "14:00",
-    "duration": "30",
-    "timezone": "Etc/GMT-1",
-    "recurring": false,
-    "recurrence": "weekly",
-    "endDate": "",
-    "passcodeEnabled": true,
-    "passcode": "lcft0u",
-    "waitingRoom": false,
-    "hostVideo": "on",
-    "participantVideo": "on",
-    "muteOnEntry": true,
-    "autoRecord": false,
-    "description": "1.  Dashboard demo\n2. Market Potential\n3. Mitigation plan for PQC quantum safe",
-    "createdAt": "2026-04-04T04:07:48.643210",
-    "createdBy": "Ranga Galla"
-  },
   "066559ff": {
     "id": "066559ff",
     "room_id": "43493ac6",
