@@ -2409,9 +2409,8 @@ body.has-cookie-banner #joinScreen { padding-bottom: 90px; }
 .cookie-text a { color: var(--blue-600); text-decoration: underline; }
 .cookie-actions { display: flex; gap: 8px; flex-shrink: 0; }
 @media (max-width: 600px) {
-    .cookie-inner { flex-direction: column; text-align: center; }
-    .cookie-text { flex-direction: column; align-items: center; }
-    .cookie-actions { width: 100%; justify-content: center; }
+    .cookie-consent { display: none !important; }
+    body.has-cookie-banner #joinScreen { padding-bottom: 0; }
 }
 
 /* ─── Privacy Policy Page ──────────────────────────────────── */
