@@ -54,15 +54,15 @@ let authenticatedUserName = ""; // Google sign-in display name
 // Map of peer_id -> { videoEl, tile, name }
 const peerConnections = {};
 
-// ── mediasoup SFU State ──────────────────────────────────────────────────
-let msDevice = null;         // mediasoup-client Device
-let sendTransport = null;    // Send transport (local → SFU)
-let recvTransport = null;    // Receive transport (SFU → local)
-let audioProducer = null;    // Our audio Producer
-let videoProducer = null;    // Our video Producer
-let screenProducer = null;   // Our screen share Producer
-let consumers = {};          // consumerId → { consumer, peerId, kind, source }
-let myRtpCapabilities = null;
+// ── P2P WebRTC State ─────────────────────────────────────────────────────
+const rtcPeers = {};         // peerId → RTCPeerConnection
+const ICE_SERVERS = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "turn:a.relay.metered.ca:80", username: "e8dd65b92ae694560ab7b5c1", credential: "5VsSQWj2THpIx9Il" },
+    { urls: "turn:a.relay.metered.ca:443", username: "e8dd65b92ae694560ab7b5c1", credential: "5VsSQWj2THpIx9Il" },
+    { urls: "turn:a.relay.metered.ca:443?transport=tcp", username: "e8dd65b92ae694560ab7b5c1", credential: "5VsSQWj2THpIx9Il" },
+];
 
 // ── Elements ─────────────────────────────────────────────────────────────
 const joinScreen = document.getElementById("joinScreen");
@@ -386,18 +386,18 @@ async function handleSignal(msg) {
             myRole = msg.role || "participant";
             console.log("[me] My peer ID:", myPeerId, "role:", myRole);
             enterCallScreen();
-            // Create peer tiles for existing participants
+            // Create peer tiles and initiate P2P connections for existing participants
             for (const peer of msg.peers) {
                 getOrCreatePeerTile(peer.id, peer.name);
+                createP2PConnection(peer.id, true); // we are the caller
             }
-            // Start mediasoup device/transport setup
-            await loadDevice();
             break;
 
         case "peer-joined":
             showToast(`${msg.name} joined`);
             console.log("[peer-joined]", msg.peer_id, msg.name);
             getOrCreatePeerTile(msg.peer_id, msg.name);
+            // New peer will send us an offer; we wait for it
             updatePeerCount();
             updateParticipantList();
             break;
@@ -408,69 +408,29 @@ async function handleSignal(msg) {
             updateParticipantList();
             break;
 
-        // ── mediasoup SFU messages ──────────────────────────
-        case "router-rtp-capabilities":
-            await onRouterRtpCapabilities(msg.rtpCapabilities);
-            break;
-
-        case "transport-created":
-            if (msg.direction === "send") {
-                onSendTransportCreated(msg);
-            } else {
-                onRecvTransportCreated(msg);
-            }
-            break;
-
-        case "transport-connected":
-            console.log("[ms] Transport connected:", msg.transportId);
-            break;
-
-        case "produced": {
-            const pSource = (msg.appData && msg.appData.source) || msg.kind;
-            console.log("[ms] Produced:", msg.kind, msg.producerId, "source:", pSource);
-            if (sendTransport && sendTransport._produceCallbacks) {
-                const cb = sendTransport._produceCallbacks[pSource];
-                if (cb) {
-                    cb({ id: msg.producerId });
-                    delete sendTransport._produceCallbacks[pSource];
-                }
-            }
-            break;
-        }
-
-        case "consumed":
-            onConsumed(msg);
-            break;
-
-        case "new-producer":
-            onNewProducer(msg.producerId, msg.peerId, msg.kind, msg.appData);
-            break;
-
-        case "producer-closed":
-            onProducerClosed(msg.producerId, msg.peerId);
-            break;
-
-        case "producer-paused":
-            onProducerPaused(msg.peerId, msg.producerId, msg.kind, msg.paused);
-            break;
-
-        case "room-producers":
-            for (const prod of (msg.producers || [])) {
-                consumeProducer(prod.producerId, prod.peerId);
-            }
-            break;
-
-        // ── Legacy P2P fallback ─────────────────────────────
+        // ── P2P WebRTC signaling ────────────────────────────
         case "offer":
-            handleP2POffer(msg.from, msg.data);
+            await handleP2POffer(msg.from, msg.data);
             break;
 
         case "answer":
-            handleP2PAnswer(msg.from, msg.data);
+            await handleP2PAnswer(msg.from, msg.data);
             break;
 
         case "ice-candidate":
             handleP2PIce(msg.from, msg.data);
+            break;
+
+        case "media-state":
+            onRemoteMediaState(msg.peerId, msg.kind, msg.enabled);
+            break;
+
+        case "screen-share-started":
+            // Remote peer started screen share — their screen track arrives via P2P
+            break;
+
+        case "screen-share-stopped":
+            onRemoteScreenShareStopped(msg.peerId);
             break;
 
         case "chat":
@@ -527,17 +487,8 @@ async function handleSignal(msg) {
             micEnabled = false;
             micBtn.classList.remove("active");
             if (localStream) localStream.getAudioTracks().forEach(t => t.enabled = false);
-            // Pause mediasoup audio producer so audio stops at the SFU
-            if (audioProducer && !audioProducer.paused) {
-                audioProducer.pause();
-                if (ws && ws.readyState === 1) {
-                    ws.send(JSON.stringify({
-                        action: "pause-producer",
-                        producerId: audioProducer.id,
-                        kind: "audio",
-                        paused: true,
-                    }));
-                }
+            if (ws && ws.readyState === 1) {
+                ws.send(JSON.stringify({ action: "media-state", kind: "audio", enabled: false }));
             }
             localMicIndicator.textContent = "🔇";
             localMicIndicator.classList.add("muted");
@@ -551,16 +502,8 @@ async function handleSignal(msg) {
             if (localStream) {
                 localStream.getAudioTracks().forEach(t => t.enabled = true);
             }
-            if (audioProducer) {
-                if (audioProducer.paused) audioProducer.resume();
-                if (ws && ws.readyState === 1) {
-                    ws.send(JSON.stringify({
-                        action: "pause-producer",
-                        producerId: audioProducer.id,
-                        kind: "audio",
-                        paused: false,
-                    }));
-                }
+            if (ws && ws.readyState === 1) {
+                ws.send(JSON.stringify({ action: "media-state", kind: "audio", enabled: true }));
             }
             localMicIndicator.textContent = "🎤";
             localMicIndicator.classList.remove("muted");
@@ -988,16 +931,9 @@ function toggleMic() {
     if (localStream) {
         localStream.getAudioTracks().forEach(t => t.enabled = micEnabled);
     }
-    // Pause/resume mediasoup audio producer
-    if (audioProducer) {
-        if (micEnabled) audioProducer.resume();
-        else audioProducer.pause();
-        ws.send(JSON.stringify({
-            action: "pause-producer",
-            producerId: audioProducer.id,
-            kind: "audio",
-            paused: !micEnabled,
-        }));
+    // Notify peers of mic state change
+    if (ws && ws.readyState === 1) {
+        ws.send(JSON.stringify({ action: "media-state", kind: "audio", enabled: micEnabled }));
     }
     localMicIndicator.textContent = micEnabled ? "🎤" : "🔇";
     localMicIndicator.classList.toggle("muted", !micEnabled);
@@ -1021,21 +957,11 @@ async function toggleCam() {
                     localStream = camStream;
                 }
                 localVideo.srcObject = localStream;
-                // Create mediasoup video producer if in a call
-                if (sendTransport && !videoProducer) {
-                    try {
-                        videoProducer = await sendTransport.produce({
-                            track: newTrack,
-                            encodings: [
-                                { maxBitrate: 100000 },
-                                { maxBitrate: 300000 },
-                                { maxBitrate: 900000 },
-                            ],
-                            codecOptions: { videoGoogleStartBitrate: 1000 },
-                        });
-                        console.log("[ms] Video producer created on toggle:", videoProducer.id);
-                    } catch (e) {
-                        console.error("[ms] Video produce on toggle failed:", e);
+                // Add video track to all existing P2P connections
+                for (const peerId in rtcPeers) {
+                    const pc = rtcPeers[peerId];
+                    if (pc && pc.connectionState !== "closed") {
+                        pc.addTrack(newTrack, localStream);
                     }
                 }
             } catch (e) {
@@ -1047,31 +973,15 @@ async function toggleCam() {
         } else {
             existingVideo.forEach(t => t.enabled = true);
         }
-        // Resume existing producer
-        if (videoProducer && videoProducer.paused) {
-            videoProducer.resume();
-            ws.send(JSON.stringify({
-                action: "pause-producer",
-                producerId: videoProducer.id,
-                kind: "video",
-                paused: false,
-            }));
-        }
     } else {
         // Disable video tracks
         if (localStream) {
             localStream.getVideoTracks().forEach(t => t.enabled = false);
         }
-        // Pause mediasoup video producer
-        if (videoProducer) {
-            videoProducer.pause();
-            ws.send(JSON.stringify({
-                action: "pause-producer",
-                producerId: videoProducer.id,
-                kind: "video",
-                paused: true,
-            }));
-        }
+    }
+    // Notify peers of cam state change
+    if (ws && ws.readyState === 1) {
+        ws.send(JSON.stringify({ action: "media-state", kind: "video", enabled: camEnabled }));
     }
     localVideoOff.style.display = camEnabled ? "none" : "";
 }
@@ -1092,16 +1002,19 @@ async function toggleScreenShare() {
         const screenTrack = screenStream.getVideoTracks()[0];
         screenTrack.onended = () => stopScreenShare();
 
-        // Produce screen as a SEPARATE producer via mediasoup
-        if (sendTransport) {
-            try {
-                screenProducer = await sendTransport.produce({
-                    track: screenTrack,
-                    appData: { source: "screen" },
-                });
-                console.log("[ms] Screen producer created:", screenProducer.id);
-            } catch (e) {
-                console.error("[ms] Screen produce failed:", e);
+        // Add screen track to all P2P connections
+        for (const peerId in rtcPeers) {
+            const pc = rtcPeers[peerId];
+            if (pc && pc.connectionState !== "closed") {
+                pc.addTrack(screenTrack, screenStream);
+                // Renegotiate
+                try {
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    ws.send(JSON.stringify({ action: "offer", target: peerId, data: pc.localDescription }));
+                } catch (e) {
+                    console.error("[p2p] Renegotiation failed for screen share:", e);
+                }
             }
         }
 
@@ -1122,23 +1035,32 @@ async function toggleScreenShare() {
 
 function stopScreenShare() {
     if (screenStream) {
-        screenStream.getTracks().forEach(t => t.stop());
+        screenStream.getTracks().forEach(t => {
+            // Remove screen track from all peer connections
+            for (const peerId in rtcPeers) {
+                const pc = rtcPeers[peerId];
+                if (pc) {
+                    const senders = pc.getSenders();
+                    const sender = senders.find(s => s.track === t);
+                    if (sender) pc.removeTrack(sender);
+                }
+            }
+            t.stop();
+        });
         screenStream = null;
     }
     screenSharing = false;
     screenBtn.classList.remove("active");
 
-    // Close the separate screen producer
-    if (screenProducer) {
-        // Notify server to close and broadcast to peers
-        if (ws && ws.readyState === 1) {
-            ws.send(JSON.stringify({
-                action: "close-producer",
-                producerId: screenProducer.id,
-            }));
+    // Renegotiate with all peers
+    for (const peerId in rtcPeers) {
+        const pc = rtcPeers[peerId];
+        if (pc && pc.connectionState !== "closed") {
+            pc.createOffer().then(offer => {
+                pc.setLocalDescription(offer);
+                ws.send(JSON.stringify({ action: "offer", target: peerId, data: offer }));
+            }).catch(() => {});
         }
-        screenProducer.close();
-        screenProducer = null;
     }
 
     // Restore local video to camera
@@ -1156,20 +1078,11 @@ function stopScreenShare() {
 function leaveCall() {
     if (recording) stopRecording();
 
-    // Close mediasoup producers
-    if (audioProducer) { audioProducer.close(); audioProducer = null; }
-    if (videoProducer) { videoProducer.close(); videoProducer = null; }
-    if (screenProducer) { screenProducer.close(); screenProducer = null; }
-    // Close all consumers
-    for (const cid in consumers) {
-        consumers[cid].consumer.close();
+    // Close all P2P connections
+    for (const peerId in rtcPeers) {
+        if (rtcPeers[peerId]) rtcPeers[peerId].close();
+        delete rtcPeers[peerId];
     }
-    consumers = {};
-    // Close transports
-    if (sendTransport) { sendTransport.close(); sendTransport = null; }
-    if (recvTransport) { recvTransport.close(); recvTransport = null; }
-    msDevice = null;
-    myRtpCapabilities = null;
 
     for (const pid in peerConnections) {
         peerConnections[pid].tile.remove();
@@ -1388,7 +1301,7 @@ function sendChat() {
     chatInput.value = "";
 }
 
-// ── WebRTC via mediasoup SFU ─────────────────────────────────────────────
+// ── Audio resume helper ──────────────────────────────────────────────────
 
 function resumeAllRemoteAudio() {
     Object.values(peerConnections).forEach(conn => {
@@ -1455,267 +1368,155 @@ function getOrCreatePeer(peerId, peerName) {
     return getOrCreatePeerTile(peerId, peerName);
 }
 
-// ── mediasoup: Load device ───────────────────────────────────────────────
-async function loadDevice() {
-    if (msDevice) return;
-    ws.send(JSON.stringify({ action: "get-router-rtp-capabilities" }));
-}
+// ── P2P WebRTC ───────────────────────────────────────────────────────────
 
-async function onRouterRtpCapabilities(rtpCapabilities) {
-    try {
-        const mediasoupClient = window.mediasoupClient;
-        msDevice = new mediasoupClient.Device();
-        await msDevice.load({ routerRtpCapabilities: rtpCapabilities });
-        myRtpCapabilities = msDevice.rtpCapabilities;
-        console.log("[ms] Device loaded");
-        // Create transports
-        await createSendTransport();
-        await createRecvTransport();
-    } catch (e) {
-        console.error("[ms] Failed to load device:", e);
+function createP2PConnection(peerId, isCaller) {
+    if (rtcPeers[peerId]) return rtcPeers[peerId];
+
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    rtcPeers[peerId] = pc;
+
+    // Add local tracks to the connection
+    if (localStream) {
+        localStream.getTracks().forEach(track => {
+            pc.addTrack(track, localStream);
+        });
     }
-}
 
-// ── mediasoup: Create Send Transport ─────────────────────────────────────
-async function createSendTransport() {
-    ws.send(JSON.stringify({ action: "create-transport", direction: "send" }));
-}
-
-function onSendTransportCreated(data) {
-    sendTransport = msDevice.createSendTransport({
-        id: data.id,
-        iceParameters: data.iceParameters,
-        iceCandidates: data.iceCandidates,
-        dtlsParameters: data.dtlsParameters,
-        iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
-            { urls: "stun:stun1.l.google.com:19302" },
-            { urls: "turn:a.relay.metered.ca:80", username: "e8dd65b92ae694560ab7b5c1", credential: "5VsSQWj2THpIx9Il" },
-            { urls: "turn:a.relay.metered.ca:443", username: "e8dd65b92ae694560ab7b5c1", credential: "5VsSQWj2THpIx9Il" },
-            { urls: "turn:a.relay.metered.ca:443?transport=tcp", username: "e8dd65b92ae694560ab7b5c1", credential: "5VsSQWj2THpIx9Il" },
-        ],
-        iceTransportPolicy: "all",
-    });
-
-    sendTransport.on("connect", ({ dtlsParameters }, callback, errback) => {
-        ws.send(JSON.stringify({
-            action: "connect-transport",
-            transportId: sendTransport.id,
-            dtlsParameters,
-        }));
-        // Server will respond with transport-connected; for simplicity, resolve now
-        callback();
-    });
-
-    sendTransport.on("produce", ({ kind, rtpParameters, appData }, callback, errback) => {
-        // Use source-aware key so camera and screen don't collide
-        if (!sendTransport._produceCallbacks) sendTransport._produceCallbacks = {};
-        const source = (appData && appData.source) || kind;
-        sendTransport._produceCallbacks[source] = callback;
-        ws.send(JSON.stringify({
-            action: "produce",
-            transportId: sendTransport.id,
-            kind,
-            rtpParameters,
-            appData: appData || {},
-        }));
-    });
-
-    console.log("[ms] Send transport created:", sendTransport.id);
-    // Now produce local tracks
-    produceLocalTracks();
-}
-
-// ── mediasoup: Create Recv Transport ─────────────────────────────────────
-async function createRecvTransport() {
-    ws.send(JSON.stringify({ action: "create-transport", direction: "recv" }));
-}
-
-function onRecvTransportCreated(data) {
-    recvTransport = msDevice.createRecvTransport({
-        id: data.id,
-        iceParameters: data.iceParameters,
-        iceCandidates: data.iceCandidates,
-        dtlsParameters: data.dtlsParameters,
-        iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
-            { urls: "stun:stun1.l.google.com:19302" },
-            { urls: "turn:a.relay.metered.ca:80", username: "e8dd65b92ae694560ab7b5c1", credential: "5VsSQWj2THpIx9Il" },
-            { urls: "turn:a.relay.metered.ca:443", username: "e8dd65b92ae694560ab7b5c1", credential: "5VsSQWj2THpIx9Il" },
-            { urls: "turn:a.relay.metered.ca:443?transport=tcp", username: "e8dd65b92ae694560ab7b5c1", credential: "5VsSQWj2THpIx9Il" },
-        ],
-        iceTransportPolicy: "all",
-    });
-
-    recvTransport.on("connect", ({ dtlsParameters }, callback, errback) => {
-        ws.send(JSON.stringify({
-            action: "connect-transport",
-            transportId: recvTransport.id,
-            dtlsParameters,
-        }));
-        callback();
-    });
-
-    console.log("[ms] Recv transport created:", recvTransport.id);
-    // Ask for existing producers in room
-    ws.send(JSON.stringify({ action: "get-room-producers" }));
-}
-
-// ── mediasoup: Produce local tracks ──────────────────────────────────────
-async function produceLocalTracks() {
-    if (!sendTransport || !localStream) return;
-
-    // Produce audio
-    const audioTrack = localStream.getAudioTracks()[0];
-    if (audioTrack) {
-        try {
-            audioProducer = await sendTransport.produce({ track: audioTrack });
-            console.log("[ms] Audio producer created:", audioProducer.id);
-            if (!micEnabled) audioProducer.pause();
-        } catch (e) {
-            console.error("[ms] Audio produce failed:", e);
+    // Handle ICE candidates
+    pc.onicecandidate = (event) => {
+        if (event.candidate && ws && ws.readyState === 1) {
+            ws.send(JSON.stringify({
+                action: "ice-candidate",
+                target: peerId,
+                data: event.candidate,
+            }));
         }
-    }
+    };
 
-    // Produce video
-    const videoTrack = localStream.getVideoTracks()[0];
-    if (videoTrack) {
-        try {
-            videoProducer = await sendTransport.produce({
-                track: videoTrack,
-                encodings: [
-                    { maxBitrate: 100000 },
-                    { maxBitrate: 300000 },
-                    { maxBitrate: 900000 },
-                ],
-                codecOptions: { videoGoogleStartBitrate: 1000 },
-            });
-            console.log("[ms] Video producer created:", videoProducer.id);
-            if (!camEnabled) videoProducer.pause();
-        } catch (e) {
-            console.error("[ms] Video produce failed:", e);
-        }
-    }
-}
+    // Handle remote tracks
+    pc.ontrack = (event) => {
+        console.log("[p2p] Got remote track:", event.track.kind, "from", peerId);
+        const conn = getOrCreatePeerTile(peerId, null);
 
-// ── mediasoup: Consume a remote producer ─────────────────────────────────
-async function consumeProducer(producerId, producerPeerId) {
-    if (!myRtpCapabilities || !recvTransport) return;
+        // Check if this is a screen share track (3rd+ track or high resolution)
+        const videoTrackCount = event.streams[0] ? event.streams[0].getVideoTracks().length : 0;
 
-    ws.send(JSON.stringify({
-        action: "consume",
-        producerId,
-        producerPeerId,
-        rtpCapabilities: myRtpCapabilities,
-    }));
-}
-
-function onConsumed(data) {
-    const { consumerId, producerId, kind, rtpParameters, producerPeerId } = data;
-    const source = (data.appData && data.appData.source) || kind;
-    const isScreen = source === "screen";
-    if (!recvTransport) return;
-
-    recvTransport.consume({
-        id: consumerId,
-        producerId,
-        kind,
-        rtpParameters,
-    }).then(consumer => {
-        consumers[consumerId] = { consumer, peerId: producerPeerId, kind, source };
-
-        if (isScreen) {
-            // Screen share gets its own tile
-            const screenPeerId = producerPeerId + "_screen";
-            const conn = getOrCreatePeerTile(screenPeerId, null);
-            // Label it as screen share
-            const nameEl = conn.tile.querySelector(".tile-name");
-            const peerName = (peerConnections[producerPeerId] && peerConnections[producerPeerId].name) || "Peer";
+        if (event.track.kind === "video" && videoTrackCount > 1) {
+            // This is likely a screen share — put in separate tile
+            const screenPeerId = peerId + "_screen";
+            const screenConn = getOrCreatePeerTile(screenPeerId, null);
+            const peerName = (peerConnections[peerId] && peerConnections[peerId].name) || "Peer";
+            const nameEl = screenConn.tile.querySelector(".tile-name");
             if (nameEl) nameEl.textContent = peerName + " (Screen)";
-            conn.tile.classList.add("screen-share-tile");
+            screenConn.tile.classList.add("screen-share-tile");
+            screenConn.stream.getVideoTracks().forEach(t => screenConn.stream.removeTrack(t));
+            screenConn.stream.addTrack(event.track);
+            screenConn.videoEl.srcObject = screenConn.stream;
+            screenConn.offOverlay.style.display = "none";
+            screenConn.videoEl.play().catch(() => {});
+        } else if (event.track.kind === "video") {
             conn.stream.getVideoTracks().forEach(t => conn.stream.removeTrack(t));
-            conn.stream.addTrack(consumer.track);
+            conn.stream.addTrack(event.track);
             conn.videoEl.srcObject = conn.stream;
             conn.offOverlay.style.display = "none";
             conn.videoEl.play().catch(() => {});
-        } else {
-            // Camera/audio — add to peer's regular tile
-            const conn = getOrCreatePeerTile(producerPeerId, null);
-            if (kind === "video") {
-                conn.stream.getVideoTracks().forEach(t => conn.stream.removeTrack(t));
-            } else if (kind === "audio") {
-                conn.stream.getAudioTracks().forEach(t => conn.stream.removeTrack(t));
-            }
-            conn.stream.addTrack(consumer.track);
+        } else if (event.track.kind === "audio") {
+            conn.stream.getAudioTracks().forEach(t => conn.stream.removeTrack(t));
+            conn.stream.addTrack(event.track);
             conn.videoEl.srcObject = conn.stream;
-            if (kind === "video") {
-                conn.offOverlay.style.display = "none";
-            }
-            if (kind === "audio") {
-                setupSpeakerDetection(producerPeerId, conn.stream);
-            }
+            setupSpeakerDetection(peerId, conn.stream);
             conn.videoEl.play().catch(() => {});
         }
+    };
 
-        // Resume the consumer on the server
-        ws.send(JSON.stringify({ action: "resume-consumer", consumerId }));
-        console.log("[ms] Consuming", kind, "from", producerPeerId, isScreen ? "(screen)" : "");
-    }).catch(e => {
-        console.error("[ms] Consume failed:", e);
-    });
-}
-
-// ── mediasoup: Handle new producer notification ──────────────────────────
-function onNewProducer(producerId, producerPeerId, kind, appData) {
-    const source = (appData && appData.source) || kind;
-    console.log("[ms] New producer:", kind, "from", producerPeerId, "source:", source);
-    consumeProducer(producerId, producerPeerId);
-}
-
-// ── mediasoup: Handle remote producer closed ─────────────────────────────
-function onProducerClosed(producerId, peerId) {
-    // Find and close any consumer for this producer
-    for (const [cid, cinfo] of Object.entries(consumers)) {
-        if (cinfo.consumer.producerId === producerId || cid === producerId) {
-            // If it was a screen share, remove the screen tile
-            if (cinfo.source === "screen") {
-                const screenPeerId = cinfo.peerId + "_screen";
-                const conn = peerConnections[screenPeerId];
-                if (conn) {
-                    conn.tile.remove();
-                    delete peerConnections[screenPeerId];
-                }
-            }
-            cinfo.consumer.close();
-            delete consumers[cid];
+    pc.onconnectionstatechange = () => {
+        console.log("[p2p] Connection state with", peerId, ":", pc.connectionState);
+        if (pc.connectionState === "failed") {
+            console.warn("[p2p] Connection failed with", peerId, "— attempting restart");
+            pc.restartIce();
         }
-    }
-    updateLayout();
+    };
+
+    pc.onnegotiationneeded = async () => {
+        if (!isCaller) return; // Only the caller creates offers
+        try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            ws.send(JSON.stringify({
+                action: "offer",
+                target: peerId,
+                data: pc.localDescription,
+            }));
+            console.log("[p2p] Sent offer to", peerId);
+        } catch (e) {
+            console.error("[p2p] Failed to send offer to", peerId, e);
+        }
+    };
+
+    return pc;
 }
 
-// ── mediasoup: Handle producer paused/resumed (mic/cam indicator) ────────
-function onProducerPaused(peerId, producerId, kind, paused) {
-    // Determine kind from consumers if not provided
-    if (!kind) {
-        for (const [cid, cinfo] of Object.entries(consumers)) {
-            if (cinfo.consumer.producerId === producerId || cid === producerId) {
-                kind = cinfo.kind;
-                break;
-            }
-        }
+async function handleP2POffer(fromPeerId, offer) {
+    console.log("[p2p] Received offer from", fromPeerId);
+    let pc = rtcPeers[fromPeerId];
+    if (!pc) {
+        pc = createP2PConnection(fromPeerId, false);
     }
+    getOrCreatePeerTile(fromPeerId, null);
+    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    ws.send(JSON.stringify({
+        action: "answer",
+        target: fromPeerId,
+        data: pc.localDescription,
+    }));
+    console.log("[p2p] Sent answer to", fromPeerId);
+}
+
+async function handleP2PAnswer(fromPeerId, answer) {
+    console.log("[p2p] Received answer from", fromPeerId);
+    const pc = rtcPeers[fromPeerId];
+    if (pc) {
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+    }
+}
+
+function handleP2PIce(fromPeerId, candidate) {
+    const pc = rtcPeers[fromPeerId];
+    if (pc && candidate) {
+        pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => {
+            console.warn("[p2p] ICE candidate error:", e);
+        });
+    }
+}
+
+function onRemoteMediaState(peerId, kind, enabled) {
+    const conn = peerConnections[peerId];
+    if (!conn) return;
     if (kind === "audio") {
-        const conn = peerConnections[peerId];
-        if (conn) {
-            conn.muted = !!paused;
-            // Update mic indicator on the peer's video tile
-            const micInd = conn.tile ? conn.tile.querySelector(".mic-indicator") : null;
-            if (micInd) {
-                micInd.textContent = paused ? "\uD83D\uDD07" : "\uD83C\uDFA4";
-                micInd.classList.toggle("muted", !!paused);
-            }
-            updateParticipantList();
+        conn.muted = !enabled;
+        const micInd = conn.tile ? conn.tile.querySelector(".mic-indicator") : null;
+        if (micInd) {
+            micInd.textContent = enabled ? "\uD83C\uDFA4" : "\uD83D\uDD07";
+            micInd.classList.toggle("muted", !enabled);
         }
+        updateParticipantList();
+    } else if (kind === "video") {
+        if (conn.offOverlay) {
+            conn.offOverlay.style.display = enabled ? "none" : "flex";
+        }
+    }
+}
+
+function onRemoteScreenShareStopped(peerId) {
+    const screenPeerId = peerId + "_screen";
+    const conn = peerConnections[screenPeerId];
+    if (conn) {
+        conn.tile.remove();
+        delete peerConnections[screenPeerId];
+        updateGridLayout();
     }
 }
 
@@ -1723,12 +1524,10 @@ function removePeer(peerId) {
     const conn = peerConnections[peerId];
     if (!conn) return;
 
-    // Close consumers for this peer (including screen share)
-    for (const [cid, cinfo] of Object.entries(consumers)) {
-        if (cinfo.peerId === peerId) {
-            cinfo.consumer.close();
-            delete consumers[cid];
-        }
+    // Close P2P connection for this peer
+    if (rtcPeers[peerId]) {
+        rtcPeers[peerId].close();
+        delete rtcPeers[peerId];
     }
 
     // Also remove screen share tile if it exists
@@ -2825,8 +2624,11 @@ async function switchCamera(deviceId) {
             oldTrack.stop();
         }
         localStream.addTrack(newTrack);
-        if (videoProducer) {
-            await videoProducer.replaceTrack({ track: newTrack });
+        // Replace track in all P2P connections
+        for (const peerId in rtcPeers) {
+            const pc = rtcPeers[peerId];
+            const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+            if (sender) sender.replaceTrack(newTrack);
         }
         localVideo.srcObject = localStream;
         showToast("Camera switched");
@@ -2849,8 +2651,11 @@ async function switchMicrophone(deviceId) {
         }
         localStream.addTrack(newTrack);
         newTrack.enabled = micEnabled;
-        if (audioProducer) {
-            await audioProducer.replaceTrack({ track: newTrack });
+        // Replace track in all P2P connections
+        for (const peerId in rtcPeers) {
+            const pc = rtcPeers[peerId];
+            const sender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
+            if (sender) sender.replaceTrack(newTrack);
         }
         showToast("Microphone switched");
     } catch (e) {
@@ -4350,8 +4155,11 @@ function startVbgPipeline(mode, sceneBgCanvas) {
 
     bgBlurStream = bgBlurCanvas.captureStream(30);
     const bgTrack = bgBlurStream.getVideoTracks()[0];
-    if (videoProducer) {
-        videoProducer.replaceTrack({ track: bgTrack });
+    // Replace video track in all P2P connections
+    for (const peerId in rtcPeers) {
+        const pc = rtcPeers[peerId];
+        const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) sender.replaceTrack(bgTrack);
     }
     localVideo.srcObject = bgBlurStream;
 }
@@ -4396,8 +4204,12 @@ async function applyVirtualBg(bgValue) {
 
     if (bgValue === "none") {
         const camTrack = localStream ? localStream.getVideoTracks()[0] : null;
-        if (videoProducer && camTrack) {
-            videoProducer.replaceTrack({ track: camTrack });
+        if (camTrack) {
+            for (const peerId in rtcPeers) {
+                const pc = rtcPeers[peerId];
+                const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+                if (sender) sender.replaceTrack(camTrack);
+            }
         }
         localVideo.srcObject = localStream;
         showToast("Background removed");

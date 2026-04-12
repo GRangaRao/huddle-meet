@@ -31,7 +31,7 @@ except ImportError:
     HAS_PG = False
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
-MEDIA_WORKER_PORT = int(os.environ.get("MEDIA_WORKER_PORT", "3000"))
+MEDIA_WORKER_PORT = int(os.environ.get("MEDIA_WORKER_PORT", "3000"))  # unused in P2P mode
 MEDIA_WORKER_URL = f"http://127.0.0.1:{MEDIA_WORKER_PORT}"
 
 # ── GitHub-backed flat-file persistence ────────────────────────────────────
@@ -1081,137 +1081,7 @@ async def websocket_handler(request):
                     print(f"[{room_id}] {name} ({peer_id}) joined as {'host' if is_host else 'participant'}. "
                           f"Room has {len(rooms[room_id])} peers.")
 
-                # ── mediasoup SFU signaling ───────────────────────────
-                elif action == "get-router-rtp-capabilities":
-                    result = await media_api("/api/router-rtp-capabilities", {"roomId": room_id})
-                    await ws.send_json({
-                        "action": "router-rtp-capabilities",
-                        "rtpCapabilities": result.get("rtpCapabilities"),
-                    })
-
-                elif action == "create-transport":
-                    direction = data.get("direction", "send")
-                    result = await media_api("/api/create-transport", {
-                        "roomId": room_id,
-                        "peerId": peer_id,
-                        "direction": direction,
-                    })
-                    await ws.send_json({
-                        "action": "transport-created",
-                        "direction": direction,
-                        "id": result.get("id"),
-                        "iceParameters": result.get("iceParameters"),
-                        "iceCandidates": result.get("iceCandidates"),
-                        "dtlsParameters": result.get("dtlsParameters"),
-                    })
-
-                elif action == "connect-transport":
-                    result = await media_api("/api/connect-transport", {
-                        "roomId": room_id,
-                        "peerId": peer_id,
-                        "transportId": data.get("transportId"),
-                        "dtlsParameters": data.get("dtlsParameters"),
-                    })
-                    await ws.send_json({
-                        "action": "transport-connected",
-                        "transportId": data.get("transportId"),
-                    })
-
-                elif action == "produce":
-                    app_data = data.get("appData", {})
-                    result = await media_api("/api/produce", {
-                        "roomId": room_id,
-                        "peerId": peer_id,
-                        "transportId": data.get("transportId"),
-                        "kind": data.get("kind"),
-                        "rtpParameters": data.get("rtpParameters"),
-                        "appData": app_data,
-                    })
-                    producerId = result.get("producerId")
-                    returned_app_data = result.get("appData", app_data)
-                    await ws.send_json({
-                        "action": "produced",
-                        "producerId": producerId,
-                        "kind": data.get("kind"),
-                        "appData": returned_app_data,
-                    })
-                    # Notify all other peers to consume this new producer
-                    await broadcast(room_id, {
-                        "action": "new-producer",
-                        "producerId": producerId,
-                        "peerId": peer_id,
-                        "kind": data.get("kind"),
-                        "appData": returned_app_data,
-                    }, exclude=peer_id)
-
-                elif action == "consume":
-                    result = await media_api("/api/consume", {
-                        "roomId": room_id,
-                        "peerId": peer_id,
-                        "producerId": data.get("producerId"),
-                        "rtpCapabilities": data.get("rtpCapabilities"),
-                    })
-                    if "error" not in result:
-                        await ws.send_json({
-                            "action": "consumed",
-                            "consumerId": result.get("consumerId"),
-                            "producerId": result.get("producerId"),
-                            "kind": result.get("kind"),
-                            "rtpParameters": result.get("rtpParameters"),
-                            "producerPeerId": data.get("producerPeerId"),
-                            "appData": result.get("appData", {}),
-                        })
-
-                elif action == "resume-consumer":
-                    await media_api("/api/resume-consumer", {
-                        "roomId": room_id,
-                        "peerId": peer_id,
-                        "consumerId": data.get("consumerId"),
-                    })
-
-                elif action == "get-room-producers":
-                    result = await media_api("/api/room-producers", {
-                        "roomId": room_id,
-                        "excludePeerId": peer_id,
-                    })
-                    await ws.send_json({
-                        "action": "room-producers",
-                        "producers": result.get("producers", []),
-                    })
-
-                elif action == "close-producer":
-                    producer_id = data.get("producerId")
-                    await media_api("/api/close-producer", {
-                        "roomId": room_id,
-                        "peerId": peer_id,
-                        "producerId": producer_id,
-                    })
-                    # Notify peers so they can clean up (e.g. screen share tile)
-                    await broadcast(room_id, {
-                        "action": "producer-closed",
-                        "producerId": producer_id,
-                        "peerId": peer_id,
-                    }, exclude=peer_id)
-
-                elif action == "pause-producer":
-                    producer_kind = data.get("kind", "")
-                    paused = data.get("paused", True)
-                    await media_api("/api/pause-producer", {
-                        "roomId": room_id,
-                        "peerId": peer_id,
-                        "producerId": data.get("producerId"),
-                        "paused": paused,
-                    })
-                    # Broadcast to other peers so they can update mic/cam indicators
-                    await broadcast(room_id, {
-                        "action": "producer-paused",
-                        "peerId": peer_id,
-                        "producerId": data.get("producerId"),
-                        "kind": producer_kind,
-                        "paused": paused,
-                    }, exclude=peer_id)
-
-                # ── Legacy P2P relay (fallback) ───────────────────────
+                # ── P2P WebRTC signaling relay ────────────────────────
                 elif action in ("offer", "answer", "ice-candidate"):
                     target = data.get("target")
                     if target and room_id and target in rooms.get(room_id, {}):
@@ -1221,6 +1091,27 @@ async def websocket_handler(request):
                             "from": peer_id,
                             "data": data.get("data"),
                         })
+
+                elif action == "media-state":
+                    # Broadcast mic/cam state changes to other peers
+                    await broadcast(room_id, {
+                        "action": "media-state",
+                        "peerId": peer_id,
+                        "kind": data.get("kind"),
+                        "enabled": data.get("enabled"),
+                    }, exclude=peer_id)
+
+                elif action == "screen-share-started":
+                    await broadcast(room_id, {
+                        "action": "screen-share-started",
+                        "peerId": peer_id,
+                    }, exclude=peer_id)
+
+                elif action == "screen-share-stopped":
+                    await broadcast(room_id, {
+                        "action": "screen-share-stopped",
+                        "peerId": peer_id,
+                    }, exclude=peer_id)
 
                 elif action == "chat":
                     text = data.get("text", "").strip()[:500]
@@ -1485,10 +1376,6 @@ async def websocket_handler(request):
         if room_id and room_id in waiting_rooms:
             waiting_rooms[room_id].pop(peer_id, None)
 
-        # Clean up mediasoup peer state
-        if room_id:
-            await media_api("/api/remove-peer", {"roomId": room_id, "peerId": peer_id})
-
         if room_id and room_id in rooms:
             rooms[room_id].pop(peer_id, None)
             name = peers.get(peer_id, {}).get("name", "?")
@@ -1571,7 +1458,7 @@ async def broadcast(room_id, message, exclude=None):
 media_worker_process = None
 
 async def on_startup(app_instance):
-    """Initialize database and start mediasoup worker."""
+    """Initialize database."""
     global media_worker_process
     await init_db()
 
@@ -1580,20 +1467,7 @@ async def on_startup(app_instance):
         _load_scheduled_meetings()
         await _github_load_meetings()
 
-    # Start the Node.js mediasoup worker
-    try:
-        media_worker_process = subprocess.Popen(
-            ["node", "media_worker.js"],
-            cwd=str(Path(__file__).parent),
-            env={**os.environ, "MEDIA_WORKER_PORT": str(MEDIA_WORKER_PORT)},
-        )
-        print(f"[media] mediasoup worker started (PID: {media_worker_process.pid})")
-        # Give it a moment to start up
-        await asyncio.sleep(1.5)
-    except FileNotFoundError:
-        print("[media] WARNING: Node.js not found — mediasoup SFU disabled, falling back to P2P relay")
-    except Exception as e:
-        print(f"[media] WARNING: Could not start mediasoup worker: {e}")
+    print("[media] P2P mode — no mediasoup worker needed")
 
     # Start ISO 27001 background tasks: session cleanup + data retention
     asyncio.ensure_future(_session_cleanup_loop())
@@ -1647,13 +1521,9 @@ async def _data_retention_loop():
 
 async def on_shutdown(app_instance):
     """Clean up resources on shutdown."""
-    global media_worker_process, http_session
+    global http_session
     if http_session:
         await http_session.close()
-    if media_worker_process:
-        media_worker_process.terminate()
-        media_worker_process.wait(timeout=5)
-        print("[media] mediasoup worker stopped")
     if db_pool:
         await db_pool.close()
         print("[db] PostgreSQL pool closed")
