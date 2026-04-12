@@ -1,1 +1,24 @@
-{}
+{
+  "f283c689": {
+    "id": "f283c689",
+    "room_id": "0fb59c57",
+    "topic": "Untitled Meeting",
+    "date": "2026-04-12",
+    "time": "21:00",
+    "duration": 30,
+    "timezone": "Etc/GMT-1",
+    "recurring": false,
+    "recurrence": "weekly",
+    "endDate": "",
+    "passcodeEnabled": true,
+    "passcode": "ujpy36",
+    "waitingRoom": false,
+    "hostVideo": "on",
+    "participantVideo": "on",
+    "muteOnEntry": true,
+    "autoRecord": false,
+    "description": "",
+    "createdAt": "2026-04-12T20:04:55.407621",
+    "createdBy": "Ranga Galla"
+  }
+}
