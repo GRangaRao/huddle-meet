@@ -32,10 +32,13 @@
 </div>
 <script>
 (function() {
+    var isMobile = window.innerWidth <= 600;
     var consent = localStorage.getItem('huddle_cookie_consent');
-    if (!consent) {
+    if (!consent && !isMobile) {
         document.getElementById('cookieConsent').style.display = 'flex';
         document.body.classList.add('has-cookie-banner');
+    } else if (!consent && isMobile) {
+        localStorage.setItem('huddle_cookie_consent', JSON.stringify({essential:true, analytics:false, ts: new Date().toISOString()}));
     }
     document.getElementById('cookieAcceptBtn').addEventListener('click', function() {
         localStorage.setItem('huddle_cookie_consent', JSON.stringify({essential:true, analytics:true, ts: new Date().toISOString()}));
