@@ -14,7 +14,7 @@
 </head>
 <body>
 
-<!-- ── Cookie Consent Banner (GDPR) ──────────────────────────── -->
+<!-- ── Cookie Consent Banner (GDPR) — hidden ──────────────────── -->
 <div id="cookieConsent" class="cookie-consent" style="display:none">
     <div class="cookie-inner">
         <div class="cookie-text">
@@ -32,24 +32,10 @@
 </div>
 <script>
 (function() {
-    var isMobile = window.innerWidth <= 600;
-    var consent = localStorage.getItem('huddle_cookie_consent');
-    if (!consent && !isMobile) {
-        document.getElementById('cookieConsent').style.display = 'flex';
-        document.body.classList.add('has-cookie-banner');
-    } else if (!consent && isMobile) {
+    // Auto-accept essential cookies, never show banner
+    if (!localStorage.getItem('huddle_cookie_consent')) {
         localStorage.setItem('huddle_cookie_consent', JSON.stringify({essential:true, analytics:false, ts: new Date().toISOString()}));
     }
-    document.getElementById('cookieAcceptBtn').addEventListener('click', function() {
-        localStorage.setItem('huddle_cookie_consent', JSON.stringify({essential:true, analytics:true, ts: new Date().toISOString()}));
-        document.getElementById('cookieConsent').style.display = 'none';
-        document.body.classList.remove('has-cookie-banner');
-    });
-    document.getElementById('cookieRejectBtn').addEventListener('click', function() {
-        localStorage.setItem('huddle_cookie_consent', JSON.stringify({essential:true, analytics:false, ts: new Date().toISOString()}));
-        document.getElementById('cookieConsent').style.display = 'none';
-        document.body.classList.remove('has-cookie-banner');
-    });
 })();
 </script>
 
