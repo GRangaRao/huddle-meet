@@ -20,5 +20,27 @@
     "description": "",
     "createdAt": "2026-04-12T20:04:55.407621",
     "createdBy": "Ranga Galla"
+  },
+  "c982c060": {
+    "id": "c982c060",
+    "room_id": "05b002b4",
+    "topic": "Demo",
+    "date": "2026-04-13",
+    "time": "18:00",
+    "duration": 30,
+    "timezone": "Etc/GMT-1",
+    "recurring": false,
+    "recurrence": "weekly",
+    "endDate": "",
+    "passcodeEnabled": true,
+    "passcode": "t4ww6l",
+    "waitingRoom": false,
+    "hostVideo": "on",
+    "participantVideo": "on",
+    "muteOnEntry": true,
+    "autoRecord": false,
+    "description": "Demo of Video App\nDemo of PQC (Post Quantum Crypto)",
+    "createdAt": "2026-04-13T16:23:53.887222",
+    "createdBy": "Ranga Galla"
   }
 }
