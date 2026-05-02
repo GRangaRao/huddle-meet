@@ -64,5 +64,27 @@
     "description": "Demo of the Apps\n1. PQC Demo\n2. Huddle Video App\n3. Irish Math AI Ed Tech tool",
     "createdAt": "2026-04-18T08:25:03.152157",
     "createdBy": "Ranga Galla"
+  },
+  "fa89d4de": {
+    "id": "fa89d4de",
+    "room_id": "04e095d4",
+    "topic": "Demo of the Apps",
+    "date": "2026-05-04",
+    "time": "19:00",
+    "duration": 30,
+    "timezone": "Etc/GMT-1",
+    "recurring": false,
+    "recurrence": "weekly",
+    "endDate": "",
+    "passcodeEnabled": true,
+    "passcode": "elgul8",
+    "waitingRoom": false,
+    "hostVideo": "on",
+    "participantVideo": "on",
+    "muteOnEntry": true,
+    "autoRecord": false,
+    "description": "1.  Huddle Video Calling App\n2. PQC Sentinel",
+    "createdAt": "2026-05-02T11:29:52.196611",
+    "createdBy": "Ranga Galla"
   }
 }
